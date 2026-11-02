@@ -2,15 +2,16 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import App from "./App";
 
-describe("Routa page", () => {
-  it("renders the Routa landing page", () => {
+describe("Roota page", () => {
+  it("renders the Roota landing page", () => {
     render(<App />);
 
-    expect(screen.getByRole("heading", { name: "Routa" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Roota" })).toBeInTheDocument();
     expect(
-      screen.getByText("Detect operational drift before it becomes operational risk."),
+      screen.getByText("Stateful fault isolation for industrial drives"),
     ).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Drift Report" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Analyze Drift" })).toBeDisabled();
+    expect(
+      screen.getByRole("heading", { name: "Session UI coming soon" }),
+    ).toBeInTheDocument();
   });
 });

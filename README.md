@@ -1,15 +1,14 @@
-# Routa
+# Roota
 
-Routa is an SOP drift detection tool. Upload a reference SOP alongside a current process document, and Routa identifies operational deviations before they become operational risk.
-
-> **MVP status:** This repository is an early scaffold. The UI and API health check are in place; document parsing, AI analysis, authentication, and drift detection are not implemented yet.
+Roota is a stateful fault-isolation assistant for industrial variable-frequency drives (VFDs). A technician starts a session for a supported fault, Roota recommends the next documented diagnostic check, the technician reports the result in natural language, and Roota updates the diagnostic state (facts known, causes ruled out / still open / confirmed) and picks the next check. Every recommendation cites the technical manual.
 
 ## Project structure
 
 ```
-routa/
+roota/
   frontend/   # React + Vite + TypeScript + Tailwind
   backend/    # Python + FastAPI
+  AGENTS.md
   README.md
   .gitignore
 ```
@@ -63,6 +62,7 @@ pytest
 
 ## What's next
 
-- Document upload and parsing
-- Drift analysis between reference SOP and current process
-- Authentication and persistent storage
+- Fault graphs and deterministic diagnostic engine
+- Session UI for technicians
+- Natural-language observation translation (LLM as translator only)
+- Persistent append-only session event log
