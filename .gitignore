@@ -53,3 +53,6 @@ build/
 
 # Review patches
 patches/
+
+# Local Roota data (SQLite, uploads, chroma, etc.)
+backend/data/

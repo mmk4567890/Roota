@@ -59,7 +59,7 @@ class DiagnosticState(BaseModel):
 
 def evaluate(graph: FaultGraph, facts: dict[str, Any]) -> DiagnosticState:
     """Deterministic diagnostic decision over a fault graph and known facts."""
-    _validate_facts(graph, facts)
+    validate_facts(graph, facts)
     # Graph field order, not caller order, so the same facts always serialise identically.
     facts_snapshot = {field.name: facts[field.name] for field in graph.fields if field.name in facts}
 
@@ -332,7 +332,7 @@ def _unique_sorted(fields: Iterable[str]) -> list[str]:
     return sorted(set(fields))
 
 
-def _validate_facts(graph: FaultGraph, facts: dict[str, Any]) -> None:
+def validate_facts(graph: FaultGraph, facts: dict[str, Any]) -> None:
     field_by_name = {field.name: field for field in graph.fields}
     for field_name, value in facts.items():
         field = field_by_name.get(field_name)

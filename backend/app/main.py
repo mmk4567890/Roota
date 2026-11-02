@@ -5,10 +5,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.graphs.loader import DEFAULT_GRAPHS_DIR, load_graphs
-from app.repository import InMemorySessionRepository
+from app.repository import SQLiteSessionRepository, default_db_path
 from app.routers import faults, sessions
 
-repository = InMemorySessionRepository()
+repository = SQLiteSessionRepository(default_db_path())
 
 
 @asynccontextmanager
