@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -10,6 +12,14 @@ from typing import Any, Protocol
 from uuid import UUID, uuid4
 
 from app.models import Event
+
+
+class SessionClosedError(Exception):
+    """Raised when appending to a session that already has a closed event."""
+
+
+class EventAlreadyUndoneError(Exception):
+    """Raised when an undo targets an event that already has an undo."""
 
 
 def default_db_path() -> Path:
@@ -60,18 +70,20 @@ class SQLiteSessionRepository:
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         self._initialize()
 
-    def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(
-            self._db_path,
-            check_same_thread=False,
-            isolation_level=None,
-        )
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA foreign_keys = ON")
-        return connection
+    @contextmanager
+    def _connection(self) -> Iterator[sqlite3.Connection]:
+        # sqlite3's own context manager only commits/rolls back; it never closes the
+        # connection. Close explicitly so no handle (and Windows file lock) leaks.
+        connection = sqlite3.connect(self._db_path, isolation_level=None)
+        try:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON")
+            yield connection
+        finally:
+            connection.close()
 
     def _initialize(self) -> None:
-        with self._connect() as connection:
+        with self._connection() as connection:
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS sessions (
@@ -97,17 +109,10 @@ class SQLiteSessionRepository:
                 """
             )
 
-    def reset_for_tests(self) -> None:
-        """Drop and recreate tables. Intended for tests only."""
-        with self._connect() as connection:
-            connection.execute("DROP TABLE IF EXISTS events")
-            connection.execute("DROP TABLE IF EXISTS sessions")
-        self._initialize()
-
     def create_session(self, fault_id: str, equipment_label: str) -> SessionRecord:
         session_id = uuid4()
         created_at = _utc_now()
-        with self._connect() as connection:
+        with self._connection() as connection:
             connection.execute(
                 """
                 INSERT INTO sessions (id, fault_id, equipment_label, created_at)
@@ -128,7 +133,7 @@ class SQLiteSessionRepository:
         )
 
     def get_session(self, session_id: UUID) -> SessionRecord | None:
-        with self._connect() as connection:
+        with self._connection() as connection:
             row = connection.execute(
                 """
                 SELECT id, fault_id, equipment_label, created_at
@@ -147,7 +152,7 @@ class SQLiteSessionRepository:
         )
 
     def list_events(self, session_id: UUID) -> list[Event]:
-        with self._connect() as connection:
+        with self._connection() as connection:
             rows = connection.execute(
                 """
                 SELECT id, session_id, seq, type, payload, created_at
@@ -167,7 +172,7 @@ class SQLiteSessionRepository:
     ) -> Event:
         created_at = _utc_now()
         payload_json = json.dumps(payload)
-        with self._connect() as connection:
+        with self._connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
                 session_row = connection.execute(
@@ -175,8 +180,25 @@ class SQLiteSessionRepository:
                     (str(session_id),),
                 ).fetchone()
                 if session_row is None:
-                    connection.execute("ROLLBACK")
                     raise KeyError(f"session {session_id} not found")
+                # Guards run inside the write transaction so concurrent requests
+                # cannot both pass a check made before it.
+                if connection.execute(
+                    "SELECT 1 FROM events WHERE session_id = ? AND type = 'closed'",
+                    (str(session_id),),
+                ).fetchone():
+                    raise SessionClosedError(f"session {session_id} is closed")
+                if event_type == "undo" and connection.execute(
+                    """
+                    SELECT 1 FROM events
+                    WHERE session_id = ? AND type = 'undo'
+                      AND json_extract(payload, '$.target_event_id') = ?
+                    """,
+                    (str(session_id), payload["target_event_id"]),
+                ).fetchone():
+                    raise EventAlreadyUndoneError(
+                        f"event {payload['target_event_id']} is already undone"
+                    )
 
                 seq = connection.execute(
                     """

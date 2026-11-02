@@ -16,7 +16,12 @@ from app.models import (
     SessionView,
     UndoRequest,
 )
-from app.repository import SessionRecord, SessionRepository
+from app.repository import (
+    EventAlreadyUndoneError,
+    SessionClosedError,
+    SessionRecord,
+    SessionRepository,
+)
 
 router = APIRouter(tags=["sessions"])
 
@@ -57,7 +62,7 @@ def get_session(
     graphs: dict[str, FaultGraph] = Depends(get_graphs),
 ) -> SessionView:
     record = _require_session(session_id, repository)
-    graph = _require_graph(record.fault_id, graphs)
+    graph = _graph_for_session(record, graphs)
     return _session_view(record, repository, graph)
 
 
@@ -69,7 +74,7 @@ def report_facts(
     graphs: dict[str, FaultGraph] = Depends(get_graphs),
 ) -> SessionView:
     record = _require_session(session_id, repository)
-    graph = _require_graph(record.fault_id, graphs)
+    graph = _graph_for_session(record, graphs)
     events = repository.list_events(session_id)
     _reject_if_closed(events)
 
@@ -82,7 +87,8 @@ def report_facts(
     _validate_facts_or_422(graph, payload.facts)
     _validate_check_id(graph, payload.check_id, payload.facts)
 
-    repository.append_event(
+    _append_or_409(
+        repository,
         session_id,
         "facts_reported",
         {"facts": payload.facts, "check_id": payload.check_id},
@@ -98,7 +104,7 @@ def undo_event(
     graphs: dict[str, FaultGraph] = Depends(get_graphs),
 ) -> SessionView:
     record = _require_session(session_id, repository)
-    graph = _require_graph(record.fault_id, graphs)
+    graph = _graph_for_session(record, graphs)
     events = repository.list_events(session_id)
     _reject_if_closed(events)
 
@@ -119,11 +125,7 @@ def undo_event(
             detail=f"Event {target.id} is already undone",
         )
 
-    repository.append_event(
-        session_id,
-        "undo",
-        {"target_event_id": target.id},
-    )
+    _append_or_409(repository, session_id, "undo", {"target_event_id": target.id})
     return _session_view(record, repository, graph)
 
 
@@ -134,11 +136,11 @@ def close_session(
     graphs: dict[str, FaultGraph] = Depends(get_graphs),
 ) -> SessionView:
     record = _require_session(session_id, repository)
-    graph = _require_graph(record.fault_id, graphs)
+    graph = _graph_for_session(record, graphs)
     events = repository.list_events(session_id)
     _reject_if_closed(events)
 
-    repository.append_event(session_id, "closed", {})
+    _append_or_409(repository, session_id, "closed", {})
     return _session_view(record, repository, graph)
 
 
@@ -192,6 +194,29 @@ def _require_graph(fault_id: str, graphs: dict[str, FaultGraph]) -> FaultGraph:
             detail=f"Unknown fault_id '{fault_id}'. Valid ids: {valid}",
         )
     return graph
+
+
+def _graph_for_session(record: SessionRecord, graphs: dict[str, FaultGraph]) -> FaultGraph:
+    graph = graphs.get(record.fault_id)
+    if graph is None:
+        # The request is valid; the stored session refers to a graph that is no longer loaded.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Session fault '{record.fault_id}' is not among the loaded fault graphs",
+        )
+    return graph
+
+
+def _append_or_409(
+    repository: SessionRepository,
+    session_id: UUID,
+    event_type: str,
+    payload: dict[str, Any],
+) -> None:
+    try:
+        repository.append_event(session_id, event_type, payload)
+    except (SessionClosedError, EventAlreadyUndoneError) as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
 
 
 def _validate_facts_or_422(graph: FaultGraph, facts: dict[str, Any]) -> None:
