@@ -2,6 +2,7 @@
   "fault_id": "overtemperature",
   "equipment": "vfd",
   "display_name": "Drive / heatsink overtemperature",
+  "_todo": "TODO(roota): fault codes OH/OT/OH1 are generic placeholders; replace with the chosen drive's fault codes",
   "fault_codes": ["OH", "OT", "OH1"],
   "description": "Generic VFD drive or heatsink overtemperature fault. Isolate cooling, airflow, load, ambient, and carrier-frequency causes using documented checks.",
   "fields": [
@@ -36,6 +37,14 @@
       "unit": "%",
       "description": "Drive output current as a percentage of rated current. TODO(roota): confirm measurement point and rated-current basis from the chosen manual.",
       "ask": "What is the drive load as a percentage of rated current?"
+    },
+    {
+      "name": "high_load_sustained",
+      "type": "enum",
+      "values": ["yes", "no", "unclear"],
+      "unit": null,
+      "description": "Whether the drive stays near or above its rated current for extended periods, rather than only during brief peaks. TODO(roota): replace with the manual's duty-cycle / overload criterion.",
+      "ask": "Does the drive stay near or above rated current for long periods, or only during brief peaks?"
     },
     {
       "name": "ambient_temp_c",
@@ -104,6 +113,18 @@
       }
     },
     {
+      "id": "check_load_duty_cycle",
+      "instruction": "Review the drive's load trend (or ask operations) and report whether the drive stays near or above rated current for long periods or only during brief peaks.",
+      "reason": "Near-rated load only causes overtemperature when it is sustained; brief peaks are normally within the drive's overload rating.",
+      "collects": ["high_load_sustained"],
+      "source": {
+        "doc_id": "TBD_MANUAL",
+        "section": "TODO(roota): cite duty-cycle / overload rating section from the chosen manual",
+        "page": null,
+        "_todo": "TODO(roota): replace TBD_MANUAL citation for check_load_duty_cycle"
+      }
+    },
+    {
       "id": "check_ambient_temperature",
       "instruction": "Measure the ambient air temperature at the drive and report it in °C.",
       "reason": "High ambient reduces cooling margin and can cause overtemperature trips.",
@@ -142,7 +163,8 @@
       "confirmed_when": {
         "field": "fan_status",
         "op": "in",
-        "value": ["not_running", "noisy"]
+        "value": ["not_running", "noisy"],
+        "_todo": "TODO(roota): confirm whether a noisy but running fan counts as fan failure per the chosen manual"
       },
       "promote_when": null,
       "corrective_action": "Replace or repair the cooling fan assembly per the drive manual, then retest under load.",
@@ -199,18 +221,30 @@
       "id": "excessive_load",
       "name": "Excessive load",
       "priority": 3,
-      "checks": ["check_load_level"],
+      "checks": ["check_load_level", "check_load_duty_cycle"],
       "ruled_out_when": {
-        "field": "load_percent",
-        "op": "lt",
-        "value": 90,
-        "_todo": "TODO(roota): confirm load ruled-out threshold (<90%) from the chosen manual"
+        "any": [
+          {"field": "load_percent", "op": "lt", "value": 90},
+          {
+            "all": [
+              {"field": "load_percent", "op": "lte", "value": 100},
+              {"field": "high_load_sustained", "op": "eq", "value": "no"}
+            ]
+          }
+        ],
+        "_todo": "TODO(roota): confirm load thresholds (<90% clearly fine; <=100% fine if not sustained) from the chosen manual"
       },
       "confirmed_when": {
-        "field": "load_percent",
-        "op": "gte",
-        "value": 90,
-        "_todo": "TODO(roota): confirm load confirmed threshold (>=90%) from the chosen manual"
+        "any": [
+          {"field": "load_percent", "op": "gt", "value": 100},
+          {
+            "all": [
+              {"field": "load_percent", "op": "gte", "value": 90},
+              {"field": "high_load_sustained", "op": "eq", "value": "yes"}
+            ]
+          }
+        ],
+        "_todo": "TODO(roota): confirm overload criterion (>100% of rated, or sustained >=90%) from the chosen manual"
       },
       "promote_when": {
         "field": "load_percent",

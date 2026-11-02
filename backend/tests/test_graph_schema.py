@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import json
 from typing import Any
 
 import pytest
@@ -173,3 +174,141 @@ def test_get_faults_returns_overtemperature(client: TestClient) -> None:
     assert match["display_name"] == "Drive / heatsink overtemperature"
     assert "OH" in match["fault_codes"]
     assert match["description"]
+
+
+# --- Review additions: strict keys, type-aware conditions, reachability ---
+
+
+def _set_ruled_out(payload: dict[str, Any], condition: Any) -> dict[str, Any]:
+    payload["causes"][0]["ruled_out_when"] = condition
+    return payload
+
+
+def test_accepts_todo_annotations_on_any_object() -> None:
+    payload = _minimal_graph(_todo="TODO(roota): graph-level note")
+    payload["fields"][0]["_todo"] = "TODO(roota): field note"
+    payload["checks"][0]["source"]["_todo"] = "TODO(roota): source note"
+    payload["causes"][0]["ruled_out_when"]["_todo"] = "TODO(roota): threshold note"
+    graph = FaultGraph.model_validate(payload)
+    assert graph.todo == "TODO(roota): graph-level note"
+
+
+def test_rejects_misspelled_cause_key() -> None:
+    # A typo must not silently drop a rule (the cause could then never be ruled out).
+    payload = _minimal_graph()
+    payload["causes"][0]["ruled_out_whn"] = payload["causes"][0].pop("ruled_out_when")
+    with pytest.raises(ValidationError, match="ruled_out_whn"):
+        FaultGraph.model_validate(payload)
+
+
+def test_rejects_misspelled_source_key() -> None:
+    payload = _minimal_graph()
+    payload["checks"][0]["source"]["pg"] = 12
+    with pytest.raises(ValidationError, match="pg"):
+        FaultGraph.model_validate(payload)
+
+
+def test_rejects_ordering_op_on_enum_field() -> None:
+    payload = _set_ruled_out(_minimal_graph(), {"field": "fan_status", "op": "gt", "value": "normal"})
+    with pytest.raises(ValidationError, match="not valid for enum"):
+        FaultGraph.model_validate(payload)
+
+
+def test_rejects_non_numeric_value_on_number_field() -> None:
+    payload = _minimal_graph()
+    payload["fields"].append(
+        {"name": "load_percent", "type": "number", "unit": "%", "description": "Load", "ask": "Load?"}
+    )
+    payload["checks"][0]["collects"] = ["fan_status", "load_percent"]
+    _set_ruled_out(payload, {"field": "load_percent", "op": "lt", "value": "low"})
+    with pytest.raises(ValidationError, match="must be a number"):
+        FaultGraph.model_validate(payload)
+
+
+def test_rejects_condition_testing_for_unclear() -> None:
+    payload = _set_ruled_out(_minimal_graph(), {"field": "fan_status", "op": "eq", "value": "unclear"})
+    with pytest.raises(ValidationError, match="must not test for 'unclear'"):
+        FaultGraph.model_validate(payload)
+
+
+def test_rejects_in_with_scalar_value() -> None:
+    payload = _set_ruled_out(_minimal_graph(), {"field": "fan_status", "op": "in", "value": "normal"})
+    with pytest.raises(ValidationError, match="non-empty list"):
+        FaultGraph.model_validate(payload)
+
+
+def test_rejects_list_value_without_in() -> None:
+    payload = _set_ruled_out(_minimal_graph(), {"field": "fan_status", "op": "eq", "value": ["normal"]})
+    with pytest.raises(ValidationError, match="single value"):
+        FaultGraph.model_validate(payload)
+
+
+def test_rejects_values_on_non_enum_field() -> None:
+    payload = _minimal_graph()
+    payload["fields"].append(
+        {"name": "load_percent", "type": "number", "values": ["high"], "description": "Load", "ask": "Load?"}
+    )
+    with pytest.raises(ValidationError, match="must not declare values"):
+        FaultGraph.model_validate(payload)
+
+
+def test_rejects_condition_on_field_the_cause_cannot_collect() -> None:
+    payload = _minimal_graph()
+    payload["fields"].append(
+        {"name": "ambient_temp_c", "type": "number", "unit": "°C", "description": "Ambient", "ask": "Ambient?"}
+    )
+    payload["checks"].append(
+        {
+            "id": "check_ambient",
+            "instruction": "Measure ambient.",
+            "reason": "Ambient matters.",
+            "collects": ["ambient_temp_c"],
+            "source": {"doc_id": "TBD_MANUAL", "section": "TODO(roota)", "page": None},
+        }
+    )
+    # check_ambient exists in the graph, but is not one of fan_fail's checks.
+    _set_ruled_out(payload, {"field": "ambient_temp_c", "op": "lt", "value": 40})
+    with pytest.raises(ValidationError, match="none of the cause's checks collect"):
+        FaultGraph.model_validate(payload)
+
+
+def test_rejects_cause_without_checks() -> None:
+    payload = _minimal_graph()
+    payload["causes"][0]["checks"] = []
+    with pytest.raises(ValidationError, match="checks"):
+        FaultGraph.model_validate(payload)
+
+
+def test_rejects_check_that_collects_nothing() -> None:
+    payload = _minimal_graph()
+    payload["checks"][0]["collects"] = []
+    with pytest.raises(ValidationError, match="collects"):
+        FaultGraph.model_validate(payload)
+
+
+def test_rejects_duplicate_cause_priority() -> None:
+    payload = _minimal_graph()
+    second = copy.deepcopy(payload["causes"][0])
+    second["id"] = "fan_fail_again"
+    payload["causes"].append(second)
+    with pytest.raises(ValidationError, match="duplicate cause priority"):
+        FaultGraph.model_validate(payload)
+
+
+def test_loader_names_the_invalid_file(tmp_path: Any) -> None:
+    bad = _minimal_graph()
+    bad["causes"][0]["checks"] = ["missing_check"]
+    (tmp_path / "broken.json").write_text(json.dumps(bad), encoding="utf-8")
+    with pytest.raises(ValueError, match="broken.json"):
+        load_graphs(tmp_path)
+    clear_graph_cache()
+
+
+def test_sample_load_promotion_redirects_without_confirming() -> None:
+    # Scenario 3: near-rated load must redirect the investigation (promote),
+    # not conclude it. Promotion and confirmation must therefore differ.
+    graph = load_graphs(DEFAULT_GRAPHS_DIR)["overtemperature"]
+    excessive_load = next(cause for cause in graph.causes if cause.id == "excessive_load")
+    assert excessive_load.promote_when is not None
+    assert excessive_load.promote_when != excessive_load.confirmed_when
+    assert excessive_load.checks == ["check_load_level", "check_load_duty_cycle"]

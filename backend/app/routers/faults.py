@@ -1,14 +1,9 @@
 from fastapi import APIRouter, Depends
 
 from app.engine.schema import FaultGraph
-from app.graphs.loader import get_cached_graphs
+from app.graphs.loader import get_graphs
 
 router = APIRouter(tags=["faults"])
-
-
-def get_graphs() -> dict[str, FaultGraph]:
-    """Return loaded fault graphs. Overridable in tests."""
-    return get_cached_graphs()
 
 
 @router.get("/faults")
