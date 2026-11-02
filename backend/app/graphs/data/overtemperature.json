@@ -1,0 +1,282 @@
+{
+  "fault_id": "overtemperature",
+  "equipment": "vfd",
+  "display_name": "Drive / heatsink overtemperature",
+  "fault_codes": ["OH", "OT", "OH1"],
+  "description": "Generic VFD drive or heatsink overtemperature fault. Isolate cooling, airflow, load, ambient, and carrier-frequency causes using documented checks.",
+  "fields": [
+    {
+      "name": "fan_status",
+      "type": "enum",
+      "values": ["normal", "not_running", "noisy", "unclear"],
+      "unit": null,
+      "description": "Observed status of the drive cooling fan.",
+      "ask": "What is the cooling fan doing — running normally, not running, or noisy?"
+    },
+    {
+      "name": "airflow_obstruction",
+      "type": "enum",
+      "values": ["none", "partial", "blocked", "unclear"],
+      "unit": null,
+      "description": "Whether inlet/outlet airflow paths are obstructed.",
+      "ask": "Are the drive vents or airflow path clear, partially obstructed, or blocked?"
+    },
+    {
+      "name": "heatsink_condition",
+      "type": "enum",
+      "values": ["clean", "dusty", "unclear"],
+      "unit": null,
+      "description": "Visible condition of the heatsink fins.",
+      "ask": "Is the heatsink clean or dusty?"
+    },
+    {
+      "name": "load_percent",
+      "type": "number",
+      "values": null,
+      "unit": "%",
+      "description": "Drive output current as a percentage of rated current. TODO(roota): confirm measurement point and rated-current basis from the chosen manual.",
+      "ask": "What is the drive load as a percentage of rated current?"
+    },
+    {
+      "name": "ambient_temp_c",
+      "type": "number",
+      "values": null,
+      "unit": "°C",
+      "description": "Ambient air temperature around the drive. TODO(roota): confirm sensor location and allowable ambient from the chosen manual.",
+      "ask": "What is the ambient temperature around the drive in °C?"
+    },
+    {
+      "name": "carrier_frequency_khz",
+      "type": "number",
+      "values": null,
+      "unit": "kHz",
+      "description": "Configured PWM carrier frequency. TODO(roota): confirm parameter id and default/max values from the chosen manual.",
+      "ask": "What is the carrier frequency setting in kHz?"
+    }
+  ],
+  "checks": [
+    {
+      "id": "check_fan_operation",
+      "instruction": "Observe or measure the cooling fan while the drive is powered and report whether it runs normally, is stopped, or is noisy.",
+      "reason": "Fan failure is a common first cause of heatsink overtemperature.",
+      "collects": ["fan_status"],
+      "source": {
+        "doc_id": "TBD_MANUAL",
+        "section": "TODO(roota): cite cooling-fan inspection section from the chosen manual",
+        "page": null,
+        "_todo": "TODO(roota): replace TBD_MANUAL citation for check_fan_operation"
+      }
+    },
+    {
+      "id": "check_airflow_path",
+      "instruction": "Inspect inlet and outlet vents and the airflow path for dust, debris, or blockage.",
+      "reason": "Restricted airflow reduces heatsink cooling even when the fan runs.",
+      "collects": ["airflow_obstruction"],
+      "source": {
+        "doc_id": "TBD_MANUAL",
+        "section": "TODO(roota): cite airflow / enclosure ventilation section from the chosen manual",
+        "page": null,
+        "_todo": "TODO(roota): replace TBD_MANUAL citation for check_airflow_path"
+      }
+    },
+    {
+      "id": "check_heatsink_cleanliness",
+      "instruction": "Visually inspect the heatsink fins for dust or debris buildup.",
+      "reason": "A dusty heatsink impairs heat transfer and can trip overtemperature.",
+      "collects": ["heatsink_condition"],
+      "source": {
+        "doc_id": "TBD_MANUAL",
+        "section": "TODO(roota): cite heatsink cleaning / maintenance section from the chosen manual",
+        "page": null,
+        "_todo": "TODO(roota): replace TBD_MANUAL citation for check_heatsink_cleanliness"
+      }
+    },
+    {
+      "id": "check_load_level",
+      "instruction": "Read output current (or load percent) and report it as a percentage of rated current.",
+      "reason": "Sustained high load increases losses and heatsink temperature.",
+      "collects": ["load_percent"],
+      "source": {
+        "doc_id": "TBD_MANUAL",
+        "section": "TODO(roota): cite load / current monitoring section from the chosen manual",
+        "page": null,
+        "_todo": "TODO(roota): replace TBD_MANUAL citation for check_load_level"
+      }
+    },
+    {
+      "id": "check_ambient_temperature",
+      "instruction": "Measure the ambient air temperature at the drive and report it in °C.",
+      "reason": "High ambient reduces cooling margin and can cause overtemperature trips.",
+      "collects": ["ambient_temp_c"],
+      "source": {
+        "doc_id": "TBD_MANUAL",
+        "section": "TODO(roota): cite ambient temperature limits section from the chosen manual",
+        "page": null,
+        "_todo": "TODO(roota): replace TBD_MANUAL citation for check_ambient_temperature"
+      }
+    },
+    {
+      "id": "check_carrier_frequency",
+      "instruction": "Read the configured carrier (PWM) frequency and report it in kHz.",
+      "reason": "Elevated carrier frequency increases switching losses and heating.",
+      "collects": ["carrier_frequency_khz"],
+      "source": {
+        "doc_id": "TBD_MANUAL",
+        "section": "TODO(roota): cite carrier-frequency parameter section from the chosen manual",
+        "page": null,
+        "_todo": "TODO(roota): replace TBD_MANUAL citation for check_carrier_frequency"
+      }
+    }
+  ],
+  "causes": [
+    {
+      "id": "cooling_fan_failure",
+      "name": "Cooling fan failure",
+      "priority": 1,
+      "checks": ["check_fan_operation"],
+      "ruled_out_when": {
+        "field": "fan_status",
+        "op": "eq",
+        "value": "normal"
+      },
+      "confirmed_when": {
+        "field": "fan_status",
+        "op": "in",
+        "value": ["not_running", "noisy"]
+      },
+      "promote_when": null,
+      "corrective_action": "Replace or repair the cooling fan assembly per the drive manual, then retest under load.",
+      "action_source": {
+        "doc_id": "TBD_MANUAL",
+        "section": "TODO(roota): cite fan replacement / corrective action section from the chosen manual",
+        "page": null,
+        "_todo": "TODO(roota): replace TBD_MANUAL citation for cooling_fan_failure corrective action"
+      }
+    },
+    {
+      "id": "blocked_airflow",
+      "name": "Blocked or restricted airflow",
+      "priority": 2,
+      "checks": ["check_airflow_path", "check_heatsink_cleanliness"],
+      "ruled_out_when": {
+        "all": [
+          {
+            "field": "airflow_obstruction",
+            "op": "eq",
+            "value": "none"
+          },
+          {
+            "field": "heatsink_condition",
+            "op": "eq",
+            "value": "clean"
+          }
+        ]
+      },
+      "confirmed_when": {
+        "any": [
+          {
+            "field": "airflow_obstruction",
+            "op": "in",
+            "value": ["partial", "blocked"]
+          },
+          {
+            "field": "heatsink_condition",
+            "op": "eq",
+            "value": "dusty"
+          }
+        ]
+      },
+      "promote_when": null,
+      "corrective_action": "Clear vents and airflow path; clean the heatsink; restore clear cooling airflow before returning to service.",
+      "action_source": {
+        "doc_id": "TBD_MANUAL",
+        "section": "TODO(roota): cite airflow / heatsink corrective action section from the chosen manual",
+        "page": null,
+        "_todo": "TODO(roota): replace TBD_MANUAL citation for blocked_airflow corrective action"
+      }
+    },
+    {
+      "id": "excessive_load",
+      "name": "Excessive load",
+      "priority": 3,
+      "checks": ["check_load_level"],
+      "ruled_out_when": {
+        "field": "load_percent",
+        "op": "lt",
+        "value": 90,
+        "_todo": "TODO(roota): confirm load ruled-out threshold (<90%) from the chosen manual"
+      },
+      "confirmed_when": {
+        "field": "load_percent",
+        "op": "gte",
+        "value": 90,
+        "_todo": "TODO(roota): confirm load confirmed threshold (>=90%) from the chosen manual"
+      },
+      "promote_when": {
+        "field": "load_percent",
+        "op": "gte",
+        "value": 90,
+        "_todo": "TODO(roota): confirm load promote_when threshold (>=90%) from the chosen manual"
+      },
+      "corrective_action": "Reduce mechanical/process load or upsize the drive per the manual; verify current is within rating after the change.",
+      "action_source": {
+        "doc_id": "TBD_MANUAL",
+        "section": "TODO(roota): cite overload / sizing corrective action section from the chosen manual",
+        "page": null,
+        "_todo": "TODO(roota): replace TBD_MANUAL citation for excessive_load corrective action"
+      }
+    },
+    {
+      "id": "high_ambient_temperature",
+      "name": "High ambient temperature",
+      "priority": 4,
+      "checks": ["check_ambient_temperature"],
+      "ruled_out_when": {
+        "field": "ambient_temp_c",
+        "op": "lt",
+        "value": 40,
+        "_todo": "TODO(roota): confirm ambient ruled-out threshold (<40°C) from the chosen manual"
+      },
+      "confirmed_when": {
+        "field": "ambient_temp_c",
+        "op": "gte",
+        "value": 40,
+        "_todo": "TODO(roota): confirm ambient confirmed threshold (>=40°C) from the chosen manual"
+      },
+      "promote_when": null,
+      "corrective_action": "Improve enclosure ventilation or relocate the drive to stay within the manual ambient rating.",
+      "action_source": {
+        "doc_id": "TBD_MANUAL",
+        "section": "TODO(roota): cite ambient / installation corrective action section from the chosen manual",
+        "page": null,
+        "_todo": "TODO(roota): replace TBD_MANUAL citation for high_ambient_temperature corrective action"
+      }
+    },
+    {
+      "id": "carrier_frequency_too_high",
+      "name": "Carrier frequency too high",
+      "priority": 5,
+      "checks": ["check_carrier_frequency"],
+      "ruled_out_when": {
+        "field": "carrier_frequency_khz",
+        "op": "lte",
+        "value": 8,
+        "_todo": "TODO(roota): confirm carrier ruled-out threshold (<=8 kHz) from the chosen manual"
+      },
+      "confirmed_when": {
+        "field": "carrier_frequency_khz",
+        "op": "gt",
+        "value": 8,
+        "_todo": "TODO(roota): confirm carrier confirmed threshold (>8 kHz) from the chosen manual"
+      },
+      "promote_when": null,
+      "corrective_action": "Lower the carrier frequency to the manual-recommended value for the application and thermal limits, then retest.",
+      "action_source": {
+        "doc_id": "TBD_MANUAL",
+        "section": "TODO(roota): cite carrier-frequency adjustment corrective action from the chosen manual",
+        "page": null,
+        "_todo": "TODO(roota): replace TBD_MANUAL citation for carrier_frequency_too_high corrective action"
+      }
+    }
+  ]
+}
