@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+from collections.abc import Iterable
 from enum import Enum
 from typing import Any, Literal
 
@@ -58,7 +60,8 @@ class DiagnosticState(BaseModel):
 def evaluate(graph: FaultGraph, facts: dict[str, Any]) -> DiagnosticState:
     """Deterministic diagnostic decision over a fault graph and known facts."""
     _validate_facts(graph, facts)
-    facts_snapshot = dict(facts)
+    # Graph field order, not caller order, so the same facts always serialise identically.
+    facts_snapshot = {field.name: facts[field.name] for field in graph.fields if field.name in facts}
 
     field_by_name = {field.name: field for field in graph.fields}
     check_by_id = {check.id: check for check in graph.checks}
@@ -325,7 +328,7 @@ def _is_known(facts: dict[str, Any], field_name: str) -> bool:
     return facts[field_name] != UNCLEAR
 
 
-def _unique_sorted(fields: list[str] | Any) -> list[str]:
+def _unique_sorted(fields: Iterable[str]) -> list[str]:
     return sorted(set(fields))
 
 
@@ -339,10 +342,25 @@ def _validate_facts(graph: FaultGraph, facts: dict[str, Any]) -> None:
             continue
         if field.type == "enum":
             if not isinstance(value, str) or value not in (field.values or []):
-                raise ValueError(f"invalid value for field '{field_name}'")
+                raise ValueError(
+                    f"invalid value for field '{field_name}': expected one of "
+                    f"{field.values}, got {value!r}"
+                )
         elif field.type == "number":
-            if isinstance(value, bool) or not isinstance(value, (int, float)):
-                raise ValueError(f"invalid value for field '{field_name}'")
+            # NaN and infinity compare false/true against every threshold and would
+            # silently skew cause statuses, so only finite numbers are facts.
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+            ):
+                raise ValueError(
+                    f"invalid value for field '{field_name}': expected a finite number, "
+                    f"got {value!r}"
+                )
         elif field.type == "boolean":
             if not isinstance(value, bool):
-                raise ValueError(f"invalid value for field '{field_name}'")
+                raise ValueError(
+                    f"invalid value for field '{field_name}': expected true or false, "
+                    f"got {value!r}"
+                )

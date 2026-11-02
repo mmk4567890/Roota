@@ -589,3 +589,61 @@ def test_graph_gap_escalates() -> None:
     assert state.next_action.message == (
         "The documented checks for Unresolvable are complete but do not resolve it."
     )
+
+
+# --- Review additions ---
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
+def test_non_finite_number_fact_raises(overtemperature: FaultGraph, bad: float) -> None:
+    # inf would confirm excessive_load; NaN fails every comparison and would
+    # leave the cause neither confirmed nor ruled out.
+    with pytest.raises(ValueError, match="expected a finite number"):
+        evaluate(overtemperature, {"load_percent": bad})
+
+
+def test_wrong_type_error_names_expected_values(overtemperature: FaultGraph) -> None:
+    with pytest.raises(ValueError, match=r"expected one of \['normal'"):
+        evaluate(overtemperature, {"fan_status": "spinning_fast"})
+
+
+def test_output_independent_of_fact_order(overtemperature: FaultGraph) -> None:
+    facts = {
+        "fan_status": "normal",
+        "airflow_obstruction": "partial",
+        "heatsink_condition": "dusty",
+        "load_percent": 105,
+    }
+    reversed_facts = dict(reversed(list(facts.items())))
+
+    first = evaluate(overtemperature, facts).model_dump_json()
+    second = evaluate(overtemperature, reversed_facts).model_dump_json()
+
+    assert first == second
+
+
+def test_proposal_demo_walkthrough(overtemperature: FaultGraph) -> None:
+    # The demo script from the proposal, one technician observation at a time.
+    steps: list[tuple[dict[str, Any], str, list[str]]] = [
+        ({}, "check_fan_operation", []),
+        ({"fan_status": "normal"}, "check_airflow_path", ["cooling_fan_failure"]),
+        (
+            {"airflow_obstruction": "none", "heatsink_condition": "clean"},
+            "check_load_level",
+            ["blocked_airflow", "cooling_fan_failure"],
+        ),
+        (
+            {"load_percent": 95},
+            "check_load_duty_cycle",
+            ["blocked_airflow", "cooling_fan_failure"],
+        ),
+    ]
+    facts: dict[str, Any] = {}
+    for new_facts, expected_check, expected_ruled_out in steps:
+        facts.update(new_facts)
+        state = evaluate(overtemperature, facts)
+        assert state.next_action.type == "check"
+        assert state.next_action.check is not None
+        assert state.next_action.check.id == expected_check
+        ruled_out = sorted(c.cause_id for c in state.causes if c.status == "ruled_out")
+        assert ruled_out == expected_ruled_out
