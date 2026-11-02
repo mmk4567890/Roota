@@ -50,3 +50,6 @@ yarn-error.log*
 dist/
 build/
 *.egg
+
+# Review patches
+patches/
