@@ -66,6 +66,8 @@ Copy `.env.example` and set what you need. Everything has a working offline defa
 | `ROOTA_CHROMA_DIR` | `backend/data/chroma` | Vector store for ingested manuals |
 | `ROOTA_DOCS_DB_PATH` | `backend/data/docs.db` | Registry of ingested manuals |
 
+Outbound HTTPS (the Anthropic API, the embedding model download) verifies certificates against the operating system's trust store, not Python's bundled list. That keeps it working behind antivirus HTTPS scanning (e.g. Avast Web Shield) or a corporate proxy, with verification fully on.
+
 ### Manuals
 
 Put PDFs in `docs/manuals/` (gitignored), then from `backend/`:

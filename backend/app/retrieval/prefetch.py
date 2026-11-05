@@ -8,8 +8,14 @@ before taking Roota offline.
 from __future__ import annotations
 
 import argparse
-import sys
+import hashlib
 from pathlib import Path
+
+import httpx
+
+from app.tls import system_ssl_context
+
+DOWNLOAD_TIMEOUT_SECONDS = 120.0
 
 
 def default_model_cache_dir() -> Path:
@@ -27,13 +33,43 @@ def model_files_present(cache_dir: Path | None = None) -> bool:
     return (extracted / "model.onnx").is_file() and (extracted / "tokenizer.json").is_file()
 
 
+def download_archive(cache_dir: Path | None = None) -> Path:
+    """Download Chroma's model archive with the OS trust store.
+
+    Chroma's own downloader verifies against certifi, which fails behind
+    antivirus or proxy TLS scanning (see app/tls.py). Chroma skips its download
+    when the archive is present and its SHA-256 matches, then extracts it, so
+    the hash Chroma ships is checked here before the file is kept.
+    """
+    from chromadb.utils.embedding_functions.onnx_mini_lm_l6_v2 import ONNXMiniLM_L6_V2
+
+    root = cache_dir if cache_dir is not None else default_model_cache_dir()
+    root.mkdir(parents=True, exist_ok=True)
+    archive = root / ONNXMiniLM_L6_V2.ARCHIVE_FILENAME
+    partial = archive.with_name(archive.name + ".part")
+    digest = hashlib.sha256()
+    with httpx.Client(verify=system_ssl_context(), timeout=DOWNLOAD_TIMEOUT_SECONDS) as client:
+        with client.stream("GET", ONNXMiniLM_L6_V2.MODEL_DOWNLOAD_URL) as response:
+            response.raise_for_status()
+            with partial.open("wb") as handle:
+                for chunk in response.iter_bytes():
+                    handle.write(chunk)
+                    digest.update(chunk)
+    if digest.hexdigest() != ONNXMiniLM_L6_V2._MODEL_SHA256:
+        partial.unlink()
+        raise RuntimeError("downloaded embedding model archive failed its SHA-256 check")
+    partial.replace(archive)
+    return archive
+
+
 def embed_probe() -> tuple[Path, int]:
     """Load DefaultEmbeddingFunction and embed one string. May download the model."""
     from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
 
     cache_dir = default_model_cache_dir()
     vectors = DefaultEmbeddingFunction()(["roota embedding prefetch probe"])
-    if not vectors or not vectors[0]:
+    # Chroma returns numpy arrays: `not vectors[0]` raises ValueError on them.
+    if len(vectors) == 0 or len(vectors[0]) == 0:
         raise RuntimeError("DefaultEmbeddingFunction returned an empty vector")
     return cache_dir, len(vectors[0])
 
@@ -68,6 +104,9 @@ def run_prefetch() -> int:
     cache_dir = default_model_cache_dir()
     print(f"Loading Chroma DefaultEmbeddingFunction (cache={cache_dir})...")
     try:
+        if not model_files_present(cache_dir):
+            print("Downloading the model archive (about 80 MB)...")
+            download_archive(cache_dir)
         resolved, size = embed_probe()
     except Exception as error:
         print(

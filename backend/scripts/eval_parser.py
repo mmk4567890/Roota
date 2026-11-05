@@ -116,7 +116,8 @@ def main() -> int:
         expected_fields = _check_fields(graph, case.get("check_id"))
 
         try:
-            api_calls += 1
+            if args.parser == "anthropic":
+                api_calls += 1
             parsed = validate_parse(
                 observation_parser.parse(text, graph, expected_fields), graph
             )

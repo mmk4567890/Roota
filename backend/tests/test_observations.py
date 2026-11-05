@@ -312,7 +312,8 @@ def test_anthropic_prompt_keeps_text_inside_delimiters(
     assert injection in inside
     assert injection not in before
     assert injection not in after
-    assert captured["kwargs"]["tool_choice"] == {"type": "tool", "name": TOOL_NAME}
+    # Forced tool choice is a 400 on Claude Sonnet 5.5 / Opus 5.5.
+    assert captured["kwargs"]["tool_choice"] == {"type": "auto"}
 
 
 def test_anthropic_api_error_maps_to_502_no_event(client: TestClient) -> None:
