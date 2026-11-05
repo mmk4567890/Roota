@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 from uuid import UUID
 
@@ -27,8 +28,10 @@ from app.repository import (
     SessionRepository,
 )
 from app.retrieval.evidence import get_evidence
-from app.retrieval.store import ManualStore
+from app.retrieval.store import TBD_MANUAL, ManualStore
 from app.routers.docs import get_manual_store
+
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter(tags=["sessions"])
@@ -262,22 +265,93 @@ def _session_view(
 
 
 def _attach_evidence(state: DiagnosticState, store: ManualStore) -> DiagnosticState:
-    """API-layer only: attach verbatim manual passages to check / root_cause actions."""
+    """API-layer only: attach verbatim manual passages to check / root_cause actions.
+
+    Retrieval failures never fail the session: diagnostic state is independent of
+    evidence. Status distinguishes no manual / nothing found / retrieval broken.
+    """
     action = state.next_action
     if action.type not in ("check", "root_cause") or action.source is None:
-        return state
+        return state.model_copy(
+            update={
+                "next_action": action.model_copy(
+                    update={
+                        "evidence": None,
+                        "evidence_status": None,
+                        "evidence_error": None,
+                    }
+                ),
+            }
+        )
 
     if action.type == "check" and action.check is not None:
         query = action.check.instruction
     else:
         query = action.message
 
-    evidence = get_evidence(action.source, query, store=store)
+    source = action.source
+    if source.doc_id == TBD_MANUAL:
+        return state.model_copy(
+            update={
+                "next_action": action.model_copy(
+                    update={
+                        "evidence": [],
+                        "evidence_status": "no_manual",
+                        "evidence_error": None,
+                    }
+                ),
+            }
+        )
+
+    try:
+        if not store.has_doc(source.doc_id):
+            return state.model_copy(
+                update={
+                    "next_action": action.model_copy(
+                        update={
+                            "evidence": [],
+                            "evidence_status": "no_manual",
+                            "evidence_error": None,
+                        }
+                    ),
+                }
+            )
+        evidence = get_evidence(source, query, store=store)
+    except Exception as error:
+        logger.exception("Manual evidence retrieval failed")
+        return state.model_copy(
+            update={
+                "next_action": action.model_copy(
+                    update={
+                        "evidence": None,
+                        "evidence_status": "unavailable",
+                        "evidence_error": _safe_evidence_error(error),
+                    }
+                ),
+            }
+        )
+
     return state.model_copy(
         update={
-            "next_action": action.model_copy(update={"evidence": evidence}),
+            "next_action": action.model_copy(
+                update={
+                    "evidence": evidence,
+                    "evidence_status": "attached",
+                    "evidence_error": None,
+                }
+            ),
         }
     )
+
+
+def _safe_evidence_error(error: BaseException) -> str:
+    """Short status for the UI: type name + fixed phrase, never paths or secrets."""
+    name = type(error).__name__
+    lowered = name.lower()
+    # Match embedding-related exception *types* only — never str(error) (paths/keys).
+    if any(token in lowered for token in ("onnx", "embedding", "tokenizer")):
+        return f"{name}: embedding model not available"
+    return f"{name}: retrieval failed"
 
 
 def _require_session(

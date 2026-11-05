@@ -73,6 +73,13 @@ def main() -> int:
         default="overtemperature",
         help="Fault graph id to evaluate against",
     )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Evaluate only the first N cases (useful for anthropic cost control)",
+    )
     args = parser.parse_args()
 
     graphs = load_graphs(DEFAULT_GRAPHS_DIR)
@@ -88,10 +95,15 @@ def main() -> int:
     cases = _load_cases(args.cases)
     if not cases:
         raise SystemExit(f"No cases found in {args.cases}")
+    if args.limit is not None:
+        if args.limit < 1:
+            raise SystemExit("--limit must be >= 1")
+        cases = cases[: args.limit]
 
     field_hits = 0
     field_total = 0
     case_hits = 0
+    api_calls = 0
     failures: list[str] = []
 
     for case in cases:
@@ -104,6 +116,7 @@ def main() -> int:
         expected_fields = _check_fields(graph, case.get("check_id"))
 
         try:
+            api_calls += 1
             parsed = validate_parse(
                 observation_parser.parse(text, graph, expected_fields), graph
             )
@@ -143,6 +156,7 @@ def main() -> int:
     field_accuracy = field_hits / field_total if field_total else 0.0
 
     print(f"parser={args.parser} cases={len(cases)} fault_id={args.fault_id}")
+    print(f"api_calls={api_calls}")
     print(f"case_accuracy={case_accuracy:.1%} ({case_hits}/{len(cases)})")
     print(f"field_accuracy={field_accuracy:.1%} ({field_hits}/{field_total})")
     if failures:

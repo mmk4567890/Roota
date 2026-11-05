@@ -288,6 +288,8 @@ def test_session_attaches_evidence_for_check(
         assert created.status_code == 201, created.text
         action = created.json()["state"]["next_action"]
         assert action["type"] == "check"
+        assert action["evidence_status"] == "attached"
+        assert action["evidence_error"] is None
         assert action["evidence"]
         assert action["evidence"][0]["kind"] == "cited"
         assert action["evidence"][0]["page"] == 1

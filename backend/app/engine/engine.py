@@ -58,8 +58,10 @@ class NextAction(BaseModel):
     cause_id: str | None = None
     fields: list[str] | None = None
     source: Source | None = None
-    # Populated only by the API layer after evaluate(); the engine leaves this None.
+    # Populated only by the API layer after evaluate(); the engine leaves these None.
     evidence: list[Evidence] | None = None
+    evidence_status: Literal["attached", "no_manual", "unavailable"] | None = None
+    evidence_error: str | None = None
 
 
 class DiagnosticState(BaseModel):

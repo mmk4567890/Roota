@@ -71,27 +71,39 @@ Copy `.env.example` and set what you need. Everything has a working offline defa
 Put PDFs in `docs/manuals/` (gitignored), then from `backend/`:
 
 ```bash
+python -m app.retrieval.prefetch          # download the local embedding model once
+python -m app.retrieval.prefetch --check  # verify the model is usable offline (no download)
 python -m app.retrieval.ingest ../docs/manuals/<file>.pdf --doc-id <id> --title "<title>"
 python scripts/check_citations.py
 ```
 
-The first ingest downloads Chroma's local embedding model once. The ingest command lists any pages with no extractable text (scanned pages). `check_citations.py` lists every graph citation that points at a missing manual, a page that does not exist, or a page with no text.
+On plant floors without network, run `python -m app.retrieval.prefetch` once on a connected machine first so Chroma's ONNX embedding model is cached; `--check` confirms the cache is ready without touching the network. The ingest command lists any pages with no extractable text (scanned pages). `check_citations.py` lists every graph citation that points at a missing manual, a page that does not exist, or a page with no text.
 
 ### Parser evaluation
 
 ```bash
 python scripts/eval_parser.py --parser keyword
-python scripts/eval_parser.py --parser anthropic   # calls the real API
+python scripts/eval_parser.py --parser anthropic --limit 5   # calls the real API; --limit caps cost
 ```
 
-Run backend tests:
+### Run backend tests
 
 ```bash
 cd backend
+# Use the project venv
+# Windows: .venv\Scripts\activate
+# macOS / Linux: source .venv/bin/activate
+
 python -X dev -m pytest -W error::DeprecationWarning -W error::ResourceWarning
 ```
 
-The tests never call the Anthropic API or download models, whatever is set in your shell.
+A plain `pytest` never calls the Anthropic API or downloads models, whatever is set in your shell. Live checks (real API + real embeddings) are opt-in:
+
+```bash
+python -X dev -m pytest --live tests/live
+```
+
+That command calls the real Anthropic API (requires `ANTHROPIC_API_KEY`) and may download Chroma's embedding model on first run.
 
 ## What's next
 
