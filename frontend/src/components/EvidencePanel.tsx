@@ -67,8 +67,10 @@ export function EvidencePanel({
         <p className="mt-2 text-sm text-ink-500">No cited passage attached.</p>
       ) : (
         <ul className="mt-2 space-y-3">
-          {cited.map((item) => (
-            <li key={`${item.doc_id}-${item.page}-${item.section}-cited`}>
+          {/* A page has several chunks with the same doc, page and section, so
+              those cannot be the key; the API order is stable per response. */}
+          {cited.map((item, index) => (
+            <li key={`cited-${index}`}>
               <Passage item={item} />
             </li>
           ))}
@@ -87,8 +89,8 @@ export function EvidencePanel({
           </button>
           {relatedOpen ? (
             <ul className="mt-2 space-y-3">
-              {related.map((item) => (
-                <li key={`${item.doc_id}-${item.page}-${item.section}-related`}>
+              {related.map((item, index) => (
+                <li key={`related-${index}`}>
                   <Passage item={item} />
                 </li>
               ))}

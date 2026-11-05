@@ -6,7 +6,8 @@ interface ObservationFormProps {
   submitting: boolean;
   lastParse: ParseResult | null;
   lastMessage: string | null;
-  onSubmit: (text: string) => Promise<void>;
+  /** Resolves true when the observation was recorded. */
+  onSubmit: (text: string) => Promise<boolean>;
 }
 
 export function ObservationForm({
@@ -24,8 +25,10 @@ export function ObservationForm({
     if (!trimmed || submitting || disabled) {
       return;
     }
-    await onSubmit(trimmed);
-    setText("");
+    // Clear only on success: a 422/502 must not throw away what was typed.
+    if (await onSubmit(trimmed)) {
+      setText("");
+    }
   }
 
   return (

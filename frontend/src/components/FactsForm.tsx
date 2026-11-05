@@ -6,7 +6,8 @@ interface FactsFormProps {
   disabled: boolean;
   submitting: boolean;
   checkId: string | null;
-  onSubmit: (facts: Record<string, unknown>, checkId: string | null) => Promise<void>;
+  /** Resolves true when the facts were recorded. */
+  onSubmit: (facts: Record<string, unknown>, checkId: string | null) => Promise<boolean>;
 }
 
 export function FactsForm({
@@ -34,8 +35,10 @@ export function FactsForm({
     if (Object.keys(facts).length === 0) {
       return;
     }
-    await onSubmit(facts, checkId);
-    setValues({});
+    // Clear only on success: a rejected value stays on screen to correct.
+    if (await onSubmit(facts, checkId)) {
+      setValues({});
+    }
   }
 
   function setField(name: string, value: string) {

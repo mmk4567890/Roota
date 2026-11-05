@@ -5,12 +5,17 @@ import {
   listFaults,
   reportObservation,
   type FaultInfo,
+  type ObservationResponse,
   type SessionView,
 } from "../api";
 import { ErrorBanner } from "./ErrorBanner";
 
 interface StartScreenProps {
-  onStarted: (session: SessionView, fault: FaultInfo) => void;
+  onStarted: (
+    session: SessionView,
+    fault: FaultInfo,
+    initial: { observation: ObservationResponse | null; error: string | null },
+  ) => void;
 }
 
 export function StartScreen({ onStarted }: StartScreenProps) {
@@ -63,27 +68,32 @@ export function StartScreen({ onStarted }: StartScreenProps) {
     }
     setSubmitting(true);
     setSubmitError(null);
+    let session: SessionView;
     try {
-      let session = await createSession({
+      session = await createSession({
         fault_id: selected.fault_id,
         equipment_label: equipmentLabel.trim(),
       });
-      const notes = initialNotes.trim();
-      if (notes) {
-        session = await reportObservation(session.id, { text: notes });
-      }
-      onStarted(session, selected);
     } catch (error) {
-      setSubmitError(
-        error instanceof ApiError
-          ? error.message
-          : error instanceof Error
-            ? error.message
-            : "Failed to start session",
-      );
-    } finally {
+      setSubmitError(errorText(error, "Failed to start session"));
       setSubmitting(false);
+      return;
     }
+    // The session exists from here on. If the initial notes fail, still enter
+    // it and show the error there: staying here would make "Start" create a
+    // second session and orphan this one.
+    const notes = initialNotes.trim();
+    let observation: ObservationResponse | null = null;
+    let notesError: string | null = null;
+    if (notes) {
+      try {
+        observation = await reportObservation(session.id, { text: notes });
+      } catch (error) {
+        notesError = `Session started, but the initial notes were not recorded: ${errorText(error, "request failed")}`;
+      }
+    }
+    setSubmitting(false);
+    onStarted(observation ?? session, selected, { observation, error: notesError });
   }
 
   if (loadError) {
@@ -204,4 +214,11 @@ export function StartScreen({ onStarted }: StartScreenProps) {
       </form>
     </section>
   );
+}
+
+function errorText(error: unknown, fallback: string): string {
+  if (error instanceof ApiError || error instanceof Error) {
+    return error.message;
+  }
+  return fallback;
 }

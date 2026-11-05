@@ -80,6 +80,11 @@ function CauseGroup({
                   </span>
                 ) : null}
               </div>
+              {item.status === "contradiction" && item.because.length > 0 ? (
+                <p className="mt-1 text-xs text-red-800">
+                  Conflicting facts: {item.because.join(", ")}
+                </p>
+              ) : null}
               {showBecause && item.because.length > 0 ? (
                 <p className="mt-1 text-xs text-ink-500">
                   Ruled out by: {item.because.join(", ")}

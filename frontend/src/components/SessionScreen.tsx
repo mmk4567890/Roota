@@ -6,6 +6,7 @@ import {
   reportObservation,
   undoEvent,
   type FaultInfo,
+  type ObservationResponse,
   type ParseResult,
   type SessionView,
 } from "../api";
@@ -22,7 +23,12 @@ interface SessionScreenProps {
   session: SessionView;
   fault: FaultInfo;
   onSessionChange: (session: SessionView) => void;
+  /** Leave this session for the start screen. */
   onClosed: () => void;
+  /** Result of the initial-notes observation sent by the start screen. */
+  initialObservation?: ObservationResponse | null;
+  /** Error from that observation; the session itself was created. */
+  initialError?: string | null;
 }
 
 export function SessionScreen({
@@ -30,15 +36,21 @@ export function SessionScreen({
   fault,
   onSessionChange,
   onClosed,
+  initialObservation = null,
+  initialError = null,
 }: SessionScreenProps) {
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError);
   const [observationBusy, setObservationBusy] = useState(false);
   const [factsBusy, setFactsBusy] = useState(false);
   const [undoBusyId, setUndoBusyId] = useState<number | null>(null);
   const [closeBusy, setCloseBusy] = useState(false);
   const [directEntry, setDirectEntry] = useState(false);
-  const [lastParse, setLastParse] = useState<ParseResult | null>(null);
-  const [lastMessage, setLastMessage] = useState<string | null>(null);
+  const [lastParse, setLastParse] = useState<ParseResult | null>(
+    initialObservation?.parse ?? null,
+  );
+  const [lastMessage, setLastMessage] = useState<string | null>(
+    initialObservation?.message ?? null,
+  );
 
   const closed = session.status === "closed";
   const anyBusy =
@@ -57,7 +69,7 @@ export function SessionScreen({
     );
   }
 
-  async function handleObservation(text: string): Promise<void> {
+  async function handleObservation(text: string): Promise<boolean> {
     setObservationBusy(true);
     setError(null);
     try {
@@ -68,8 +80,10 @@ export function SessionScreen({
       setLastParse(response.parse);
       setLastMessage(response.message);
       onSessionChange(response);
+      return true;
     } catch (err) {
       captureError(err);
+      return false;
     } finally {
       setObservationBusy(false);
     }
@@ -78,7 +92,7 @@ export function SessionScreen({
   async function handleFacts(
     facts: Record<string, unknown>,
     submittedCheckId: string | null,
-  ): Promise<void> {
+  ): Promise<boolean> {
     setFactsBusy(true);
     setError(null);
     try {
@@ -87,8 +101,10 @@ export function SessionScreen({
         check_id: submittedCheckId,
       });
       onSessionChange(updated);
+      return true;
     } catch (err) {
       captureError(err);
+      return false;
     } finally {
       setFactsBusy(false);
     }
@@ -115,8 +131,9 @@ export function SessionScreen({
     setError(null);
     try {
       const updated = await closeSession(session.id);
+      // Stay on the closed, read-only view so the final state stays visible;
+      // "New session" leaves it.
       onSessionChange(updated);
-      onClosed();
     } catch (err) {
       captureError(err);
     } finally {
