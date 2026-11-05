@@ -4,28 +4,12 @@ from app.engine.engine import Evidence
 from app.engine.schema import Source
 from app.retrieval.store import TBD_MANUAL, ManualStore, StoredChunk
 
-_DEFAULT_STORE: ManualStore | None = None
-
-
-def get_default_store() -> ManualStore:
-    global _DEFAULT_STORE
-    if _DEFAULT_STORE is None:
-        _DEFAULT_STORE = ManualStore()
-    return _DEFAULT_STORE
-
-
-def set_default_store(store: ManualStore | None) -> None:
-    """Replace the process-wide store (used by tests and app startup)."""
-    global _DEFAULT_STORE
-    _DEFAULT_STORE = store
-
-
 def get_evidence(
     source: Source,
     query: str,
     k: int = 3,
     *,
-    store: ManualStore | None = None,
+    store: ManualStore,
 ) -> list[Evidence]:
     """Return cited chunks first, then related semantic matches in the same doc.
 
@@ -35,7 +19,7 @@ def get_evidence(
     if source.doc_id == TBD_MANUAL:
         return []
 
-    manual_store = store if store is not None else get_default_store()
+    manual_store = store
     if not manual_store.has_doc(source.doc_id):
         return []
 

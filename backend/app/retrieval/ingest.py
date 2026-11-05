@@ -12,8 +12,11 @@ from app.retrieval.store import ManualStore, StoredChunk, validate_doc_id
 
 CHUNK_SIZE = 800
 CHUNK_OVERLAP = 150
-# Numbered headings like "7.3 Fault Codes" or "4.1.2 Cooling fan".
-SECTION_HEADING_RE = re.compile(r"^\d+(?:\.\d+)+\s+\S.*$")
+# Numbered headings like "7.3 Fault Codes" or "4.1.2 Cooling fan". The title
+# must start with a capitalised word of 3+ letters so spec lines such as
+# "1.5 kW rated output" or "2.2 Nm on terminals" are not taken for headings.
+# TODO(roota): tune against the real manual's heading style once it is chosen.
+SECTION_HEADING_RE = re.compile(r"^\d+(?:\.\d+)+\s+[A-Z][A-Za-z]{2,}.*$")
 
 
 @dataclass(frozen=True)
@@ -71,23 +74,18 @@ def chunk_page_text(
     chunk_size: int = CHUNK_SIZE,
     overlap: int = CHUNK_OVERLAP,
 ) -> list[StoredChunk]:
-    """Chunk a single page. Never spans pages. Empty pages yield one empty chunk."""
+    """Chunk a single page. Never spans pages. An empty page yields no chunks.
+
+    A blank chunk would come back from search as an empty "related" passage;
+    empty pages are recorded in the docs registry instead (``empty_pages``).
+    """
     if chunk_size < 1:
         raise ValueError("chunk_size must be >= 1")
     if overlap < 0 or overlap >= chunk_size:
         raise ValueError("overlap must be >= 0 and < chunk_size")
 
     if not page_text.strip():
-        return [
-            StoredChunk(
-                chunk_id=f"{doc_id}::p{page}::c0",
-                doc_id=doc_id,
-                title=title,
-                page=page,
-                section="",
-                text="",
-            )
-        ]
+        return []
 
     chunks: list[StoredChunk] = []
     start = 0
@@ -157,6 +155,7 @@ def ingest_pdf(
         title=title,
         filename=path.name,
         page_count=len(pages),
+        empty_pages=empty_pages,
         chunks=chunks,
     )
     return IngestResult(

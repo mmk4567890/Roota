@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import re
 import sqlite3
@@ -27,6 +28,7 @@ class DocRecord:
     title: str
     filename: str
     page_count: int
+    empty_pages: tuple[int, ...]  # pages with no extractable text (scanned)
 
 
 @dataclass(frozen=True)
@@ -61,6 +63,104 @@ def validate_doc_id(doc_id: str) -> str:
     return doc_id
 
 
+class DocsRegistry:
+    """SQLite registry of ingested manuals (doc_id, title, filename, pages).
+
+    Separate from Chroma so tools that only need page counts (check_citations)
+    never open the vector collection, which refuses an embedding function other
+    than the one it was created with.
+    """
+
+    def __init__(self, path: Path | str | None = None) -> None:
+        self._path = Path(path) if path is not None else default_docs_db_path()
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        self._initialize()
+
+    @property
+    def path(self) -> Path:
+        return self._path
+
+    @contextmanager
+    def _connection(self) -> Iterator[sqlite3.Connection]:
+        connection = sqlite3.connect(self._path, isolation_level=None)
+        try:
+            connection.row_factory = sqlite3.Row
+            yield connection
+        finally:
+            connection.close()
+
+    def _initialize(self) -> None:
+        with self._connection() as connection:
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS docs (
+                    doc_id TEXT PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    filename TEXT NOT NULL,
+                    page_count INTEGER NOT NULL,
+                    empty_pages TEXT NOT NULL DEFAULT '[]'
+                )
+                """
+            )
+            columns = {row["name"] for row in connection.execute("PRAGMA table_info(docs)")}
+            if "empty_pages" not in columns:
+                # Registry created before empty pages were recorded.
+                connection.execute(
+                    "ALTER TABLE docs ADD COLUMN empty_pages TEXT NOT NULL DEFAULT '[]'"
+                )
+
+    def has_doc(self, doc_id: str) -> bool:
+        return self.get_doc(doc_id) is not None
+
+    def get_doc(self, doc_id: str) -> DocRecord | None:
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT doc_id, title, filename, page_count, empty_pages FROM docs WHERE doc_id = ?",
+                (doc_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return _row_to_doc(row)
+
+    def list_docs(self) -> list[DocRecord]:
+        with self._connection() as connection:
+            rows = connection.execute(
+                """
+                SELECT doc_id, title, filename, page_count, empty_pages
+                FROM docs
+                ORDER BY doc_id ASC
+                """
+            ).fetchall()
+        return [_row_to_doc(row) for row in rows]
+
+    def upsert_doc(
+        self,
+        *,
+        doc_id: str,
+        title: str,
+        filename: str,
+        page_count: int,
+        empty_pages: list[int],
+    ) -> None:
+        validate_doc_id(doc_id)
+        with self._connection() as connection:
+            connection.execute(
+                """
+                INSERT INTO docs (doc_id, title, filename, page_count, empty_pages)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(doc_id) DO UPDATE SET
+                    title = excluded.title,
+                    filename = excluded.filename,
+                    page_count = excluded.page_count,
+                    empty_pages = excluded.empty_pages
+                """,
+                (doc_id, title, filename, page_count, json.dumps(sorted(empty_pages))),
+            )
+
+    def remove(self, doc_id: str) -> None:
+        with self._connection() as connection:
+            connection.execute("DELETE FROM docs WHERE doc_id = ?", (doc_id,))
+
 class ManualStore:
     """Persistent Chroma collection + SQLite docs registry for manuals."""
 
@@ -72,12 +172,8 @@ class ManualStore:
         embedding_function: EmbeddingFunction | None = None,
     ) -> None:
         self._chroma_dir = Path(chroma_dir) if chroma_dir is not None else default_chroma_dir()
-        self._docs_db_path = (
-            Path(docs_db_path) if docs_db_path is not None else default_docs_db_path()
-        )
         self._chroma_dir.mkdir(parents=True, exist_ok=True)
-        self._docs_db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._embedding_function = embedding_function
+        self._registry = DocsRegistry(docs_db_path)
 
         import warnings
 
@@ -101,96 +197,24 @@ class ManualStore:
             embedding_function=ef,  # type: ignore[arg-type]
             metadata={"hnsw:space": "cosine"},
         )
-        self._initialize_registry()
 
     @property
     def chroma_dir(self) -> Path:
         return self._chroma_dir
 
     @property
-    def docs_db_path(self) -> Path:
-        return self._docs_db_path
-
-    @contextmanager
-    def _connection(self) -> Iterator[sqlite3.Connection]:
-        connection = sqlite3.connect(self._docs_db_path, isolation_level=None)
-        try:
-            connection.row_factory = sqlite3.Row
-            yield connection
-        finally:
-            connection.close()
-
-    def _initialize_registry(self) -> None:
-        with self._connection() as connection:
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS docs (
-                    doc_id TEXT PRIMARY KEY,
-                    title TEXT NOT NULL,
-                    filename TEXT NOT NULL,
-                    page_count INTEGER NOT NULL
-                )
-                """
-            )
+    def registry(self) -> DocsRegistry:
+        return self._registry
 
     def has_doc(self, doc_id: str) -> bool:
-        return self.get_doc(doc_id) is not None
+        return self._registry.has_doc(doc_id)
 
     def get_doc(self, doc_id: str) -> DocRecord | None:
-        with self._connection() as connection:
-            row = connection.execute(
-                "SELECT doc_id, title, filename, page_count FROM docs WHERE doc_id = ?",
-                (doc_id,),
-            ).fetchone()
-        if row is None:
-            return None
-        return DocRecord(
-            doc_id=row["doc_id"],
-            title=row["title"],
-            filename=row["filename"],
-            page_count=int(row["page_count"]),
-        )
+        return self._registry.get_doc(doc_id)
 
     def list_docs(self) -> list[DocRecord]:
-        with self._connection() as connection:
-            rows = connection.execute(
-                """
-                SELECT doc_id, title, filename, page_count
-                FROM docs
-                ORDER BY doc_id ASC
-                """
-            ).fetchall()
-        return [
-            DocRecord(
-                doc_id=row["doc_id"],
-                title=row["title"],
-                filename=row["filename"],
-                page_count=int(row["page_count"]),
-            )
-            for row in rows
-        ]
+        return self._registry.list_docs()
 
-    def upsert_doc(
-        self,
-        *,
-        doc_id: str,
-        title: str,
-        filename: str,
-        page_count: int,
-    ) -> None:
-        validate_doc_id(doc_id)
-        with self._connection() as connection:
-            connection.execute(
-                """
-                INSERT INTO docs (doc_id, title, filename, page_count)
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT(doc_id) DO UPDATE SET
-                    title = excluded.title,
-                    filename = excluded.filename,
-                    page_count = excluded.page_count
-                """,
-                (doc_id, title, filename, page_count),
-            )
 
     def delete_doc_chunks(self, doc_id: str) -> None:
         """Remove all chunks for doc_id so re-ingest is idempotent."""
@@ -206,10 +230,18 @@ class ManualStore:
         title: str,
         filename: str,
         page_count: int,
+        empty_pages: list[int],
         chunks: list[StoredChunk],
     ) -> int:
-        """Replace all chunks for a document. Returns the new chunk count."""
+        """Replace all chunks for a document. Returns the new chunk count.
+
+        Chroma has no transactions, so the registry row goes first and comes
+        back last: if adding chunks fails, the doc reads as "not ingested"
+        (evidence returns [], check_citations flags it) instead of claiming
+        pages whose chunks were already deleted.
+        """
         validate_doc_id(doc_id)
+        self._registry.remove(doc_id)
         self.delete_doc_chunks(doc_id)
         if chunks:
             self._collection.add(
@@ -225,11 +257,12 @@ class ManualStore:
                     for chunk in chunks
                 ],
             )
-        self.upsert_doc(
+        self._registry.upsert_doc(
             doc_id=doc_id,
             title=title,
             filename=filename,
             page_count=page_count,
+            empty_pages=empty_pages,
         )
         return len(chunks)
 
@@ -289,6 +322,16 @@ class ManualStore:
             if len(chunks) >= k:
                 break
         return chunks
+
+
+def _row_to_doc(row: sqlite3.Row) -> DocRecord:
+    return DocRecord(
+        doc_id=row["doc_id"],
+        title=row["title"],
+        filename=row["filename"],
+        page_count=int(row["page_count"]),
+        empty_pages=tuple(json.loads(row["empty_pages"])),
+    )
 
 
 def _rows_to_chunks(result: dict[str, Any]) -> list[StoredChunk]:

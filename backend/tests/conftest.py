@@ -9,7 +9,6 @@ from app.main import app
 from app.parser.fake import KeywordParser
 from app.repository import SQLiteSessionRepository
 from app.retrieval.embeddings import FakeEmbeddingFunction
-from app.retrieval.evidence import set_default_store
 from app.retrieval.store import ManualStore
 from app.routers import docs, sessions
 
@@ -38,21 +37,11 @@ def client(
         "app.retrieval.store.default_embedding_function",
         lambda: FakeEmbeddingFunction(),
     )
-    monkeypatch.setattr(
-        "app.main.ManualStore",
-        lambda **kwargs: ManualStore(
-            chroma_dir=tmp_path / "chroma-app",
-            docs_db_path=tmp_path / "docs-app.db",
-            embedding_function=FakeEmbeddingFunction(),
-        ),
-    )
-
     store = ManualStore(
         chroma_dir=tmp_path / "chroma-client",
         docs_db_path=tmp_path / "docs-client.db",
         embedding_function=FakeEmbeddingFunction(),
     )
-    set_default_store(store)
     app.dependency_overrides[sessions.get_parser] = lambda: KeywordParser()
     app.dependency_overrides[docs.get_manual_store] = lambda: store
     try:
@@ -61,4 +50,3 @@ def client(
     finally:
         app.dependency_overrides.pop(sessions.get_parser, None)
         app.dependency_overrides.pop(docs.get_manual_store, None)
-        set_default_store(None)

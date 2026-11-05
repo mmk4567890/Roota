@@ -131,9 +131,9 @@ def test_empty_page_recorded_and_cli_reports(
     )
     assert result.page_count == 2
     assert result.empty_pages == [2]
-    page2 = fake_store.get_chunks_for_page("blank_manual", 2)
-    assert len(page2) == 1
-    assert page2[0].text == ""
+    # Recorded in the registry, not as a blank chunk search could return.
+    assert fake_store.get_chunks_for_page("blank_manual", 2) == []
+    assert fake_store.get_doc("blank_manual").empty_pages == (2,)
 
     monkeypatch.setattr(
         "app.retrieval.ingest.ManualStore",
@@ -298,11 +298,12 @@ def test_session_attaches_evidence_for_check(
 
 
 def test_check_citations_reports_missing_doc_and_page(fake_store: ManualStore) -> None:
-    fake_store.upsert_doc(
+    fake_store.registry.upsert_doc(
         doc_id="demo_manual",
         title="Demo",
         filename="demo.pdf",
         page_count=1,
+        empty_pages=[],
     )
     graphs = load_graphs(DEFAULT_GRAPHS_DIR)
     graph = graphs["overtemperature"]
@@ -316,7 +317,7 @@ def test_check_citations_reports_missing_doc_and_page(fake_store: ManualStore) -
         *graph.checks[2:],
     ]
     patched = {**graphs, "overtemperature": graph.model_copy(update={"checks": checks})}
-    issues = check_citations(patched, fake_store)
+    issues = check_citations(patched, fake_store.registry)
     kinds = {issue.kind for issue in issues}
     assert "missing_page" in kinds
     assert "missing_doc" in kinds
@@ -326,17 +327,18 @@ def test_check_citations_reports_missing_doc_and_page(fake_store: ManualStore) -
 
 def test_check_citations_skips_tbd(fake_store: ManualStore) -> None:
     graphs = load_graphs(DEFAULT_GRAPHS_DIR)
-    assert check_citations(graphs, fake_store) == []
+    assert check_citations(graphs, fake_store.registry) == []
 
 
 def test_check_citations_cli_exits_nonzero(
     fake_store: ManualStore, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    fake_store.upsert_doc(
+    fake_store.registry.upsert_doc(
         doc_id="demo_manual",
         title="Demo",
         filename="demo.pdf",
         page_count=1,
+        empty_pages=[],
     )
     graphs = load_graphs(DEFAULT_GRAPHS_DIR)
     graph = graphs["overtemperature"]
@@ -348,15 +350,6 @@ def test_check_citations_cli_exits_nonzero(
     ]
     patched = {"overtemperature": graph.model_copy(update={"checks": checks})}
 
-    monkeypatch.setattr(
-        "scripts.check_citations.load_graphs",
-        lambda _dir: patched,
-    )
-    monkeypatch.setattr(
-        "scripts.check_citations.ManualStore",
-        lambda **_kwargs: fake_store,
-    )
-
     # Import after path setup — script lives under backend/scripts.
     import importlib.util
 
@@ -367,5 +360,4 @@ def test_check_citations_cli_exits_nonzero(
     spec.loader.exec_module(module)
 
     monkeypatch.setattr(module, "load_graphs", lambda _dir: patched)
-    monkeypatch.setattr(module, "ManualStore", lambda **_kwargs: fake_store)
-    assert module.main([]) == 1
+    assert module.main(["--docs-db", str(fake_store.registry.path)]) == 1

@@ -5,6 +5,9 @@ For every Source in the loaded fault graphs:
 - doc_id TBD_MANUAL is skipped (placeholder, not yet ingested)
 - doc_id not in the docs registry -> missing doc
 - doc_id ingested but page is None, < 1, or > page_count -> missing page
+- cited page has no extractable text (scanned) -> empty page
+
+Reads only the SQLite docs registry, never the Chroma collection.
 
 Exit code 1 when any problem is found; 0 when clean.
 """
@@ -21,8 +24,7 @@ if str(BACKEND_ROOT) not in sys.path:
 
 from app.graphs.loader import DEFAULT_GRAPHS_DIR, load_graphs
 from app.retrieval.citations import check_citations
-from app.retrieval.embeddings import FakeEmbeddingFunction
-from app.retrieval.store import ManualStore, default_docs_db_path
+from app.retrieval.store import DocsRegistry, default_docs_db_path
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -39,25 +41,10 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help=f"Docs registry SQLite path (default: {default_docs_db_path()})",
     )
-    parser.add_argument(
-        "--chroma-dir",
-        type=Path,
-        default=None,
-        help="Chroma dir (only needed so ManualStore can open; registry is authoritative)",
-    )
     args = parser.parse_args(argv)
 
     graphs = load_graphs(args.graphs_dir)
-    store_kwargs: dict = {
-        "embedding_function": FakeEmbeddingFunction(),
-    }
-    if args.docs_db is not None:
-        store_kwargs["docs_db_path"] = args.docs_db
-    if args.chroma_dir is not None:
-        store_kwargs["chroma_dir"] = args.chroma_dir
-
-    store = ManualStore(**store_kwargs)
-    issues = check_citations(graphs, store)
+    issues = check_citations(graphs, DocsRegistry(args.docs_db))
 
     if not issues:
         print("OK: all ingested-doc citations point at existing pages.")

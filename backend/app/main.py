@@ -7,7 +7,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.graphs.loader import DEFAULT_GRAPHS_DIR, load_graphs
 from app.parser.factory import create_parser_from_env
 from app.repository import SQLiteSessionRepository, default_db_path
-from app.retrieval.evidence import set_default_store
 from app.retrieval.store import ManualStore
 from app.routers import docs, faults, sessions
 
@@ -21,9 +20,7 @@ async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
     # before it accepts requests. Stored on app.state (not in
     # dependency_overrides) so startup never replaces a test's override.
     app_.state.parser = create_parser_from_env()
-    store = ManualStore()
-    app_.state.manual_store = store
-    set_default_store(store)
+    app_.state.manual_store = ManualStore()
     yield
 
 

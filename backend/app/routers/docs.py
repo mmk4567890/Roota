@@ -9,13 +9,11 @@ router = APIRouter(tags=["docs"])
 
 
 def get_manual_store(request: Request) -> ManualStore:
-    """Return the process ManualStore from app.state, or the module default."""
+    """The ManualStore main's lifespan built (AGENTS.md Quality bar 9)."""
     store = getattr(request.app.state, "manual_store", None)
-    if store is not None:
-        return store
-    from app.retrieval.evidence import get_default_store
-
-    return get_default_store()
+    if store is None:
+        raise RuntimeError("Manual store was not configured")
+    return store
 
 
 class DocInfo(BaseModel):
@@ -25,6 +23,7 @@ class DocInfo(BaseModel):
     title: str
     filename: str
     page_count: int
+    empty_pages: list[int]
 
 
 class SearchHit(BaseModel):
@@ -45,6 +44,7 @@ def list_docs(store: ManualStore = Depends(get_manual_store)) -> list[DocInfo]:
             title=doc.title,
             filename=doc.filename,
             page_count=doc.page_count,
+            empty_pages=list(doc.empty_pages),
         )
         for doc in store.list_docs()
     ]
@@ -52,7 +52,7 @@ def list_docs(store: ManualStore = Depends(get_manual_store)) -> list[DocInfo]:
 
 @router.get("/docs/search", response_model=list[SearchHit])
 def search_docs(
-    q: str = Query(..., min_length=1),
+    q: str = Query(..., min_length=1, max_length=500),
     doc_id: str | None = Query(default=None),
     k: int = Query(default=5, ge=1, le=20),
     store: ManualStore = Depends(get_manual_store),
