@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, FiniteFloat, model_validator
 
 # "unclear" is the parser's "mentioned but ambiguous" value; the engine treats it as unknown.
 UNCLEAR = "unclear"
 
-ConditionScalar = bool | float | str
+# FiniteFloat: json.loads accepts NaN / Infinity, and a NaN threshold never
+# compares true, so a cause using it could never be ruled out or confirmed.
+ConditionScalar = bool | FiniteFloat | str
 ConditionValue = ConditionScalar | list[ConditionScalar]
 
 _OPS_BY_FIELD_TYPE: dict[str, set[str]] = {

@@ -347,6 +347,16 @@ def _unique_sorted(fields: Iterable[str]) -> list[str]:
     return sorted(set(fields))
 
 
+def _is_finite(value: int | float) -> bool:
+    # math.isfinite converts ints to float and raises OverflowError for ones
+    # beyond float range (e.g. a 400-digit JSON integer); those are rejected
+    # like infinity rather than surfacing as a 500.
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        return False
+
+
 def validate_facts(graph: FaultGraph, facts: dict[str, Any]) -> None:
     field_by_name = {field.name: field for field in graph.fields}
     for field_name, value in facts.items():
@@ -367,7 +377,7 @@ def validate_facts(graph: FaultGraph, facts: dict[str, Any]) -> None:
             if (
                 isinstance(value, bool)
                 or not isinstance(value, (int, float))
-                or not math.isfinite(value)
+                or not _is_finite(value)
             ):
                 raise ValueError(
                     f"invalid value for field '{field_name}': expected a finite number, "
