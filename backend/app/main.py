@@ -7,7 +7,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.graphs.loader import DEFAULT_GRAPHS_DIR, load_graphs
 from app.parser.factory import create_parser_from_env
 from app.repository import SQLiteSessionRepository, default_db_path
-from app.routers import faults, sessions
+from app.retrieval.evidence import set_default_store
+from app.retrieval.store import ManualStore
+from app.routers import docs, faults, sessions
 
 repository = SQLiteSessionRepository(default_db_path())
 
@@ -19,10 +21,21 @@ async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
     # before it accepts requests. Stored on app.state (not in
     # dependency_overrides) so startup never replaces a test's override.
     app_.state.parser = create_parser_from_env()
+    store = ManualStore()
+    app_.state.manual_store = store
+    set_default_store(store)
     yield
 
 
-app = FastAPI(title="Roota", version="0.1.0", lifespan=lifespan)
+# OpenAPI UI moves off /docs so GET /docs can list ingested manuals.
+app = FastAPI(
+    title="Roota",
+    version="0.1.0",
+    lifespan=lifespan,
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/openapi.json",
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -34,6 +47,7 @@ app.add_middleware(
 )
 app.include_router(sessions.router)
 app.include_router(faults.router)
+app.include_router(docs.router)
 app.dependency_overrides[sessions.get_repository] = lambda: repository
 
 

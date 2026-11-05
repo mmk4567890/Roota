@@ -36,6 +36,19 @@ class CauseStatus(BaseModel):
     because: list[str]
 
 
+class Evidence(BaseModel):
+    """Verbatim manual passage attached by the API layer (never by the engine)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    doc_id: str
+    title: str
+    page: int
+    section: str
+    text: str
+    kind: Literal["cited", "related"]
+
+
 class NextAction(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -45,6 +58,8 @@ class NextAction(BaseModel):
     cause_id: str | None = None
     fields: list[str] | None = None
     source: Source | None = None
+    # Populated only by the API layer after evaluate(); the engine leaves this None.
+    evidence: list[Evidence] | None = None
 
 
 class DiagnosticState(BaseModel):

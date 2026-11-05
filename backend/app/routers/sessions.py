@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from app.engine.engine import evaluate, validate_facts
+from app.engine.engine import DiagnosticState, evaluate, validate_facts
 from app.engine.replay import is_event_undone, replay_facts, session_is_closed
 from app.engine.schema import FaultGraph
 from app.graphs.loader import get_graphs
@@ -26,6 +26,10 @@ from app.repository import (
     SessionRecord,
     SessionRepository,
 )
+from app.retrieval.evidence import get_evidence
+from app.retrieval.store import ManualStore
+from app.routers.docs import get_manual_store
+
 
 router = APIRouter(tags=["sessions"])
 
@@ -52,6 +56,7 @@ def create_session(
     payload: SessionCreate,
     repository: SessionRepository = Depends(get_repository),
     graphs: dict[str, FaultGraph] = Depends(get_graphs),
+    store: ManualStore = Depends(get_manual_store),
 ) -> SessionView:
     graph = _require_graph(payload.fault_id, graphs)
     if payload.initial_facts:
@@ -64,7 +69,7 @@ def create_session(
             "facts_reported",
             {"facts": payload.initial_facts, "check_id": None},
         )
-    return _session_view(record, repository, graph)
+    return _session_view(record, repository, graph, store)
 
 
 @router.get("/sessions/{session_id}", response_model=SessionView)
@@ -72,10 +77,11 @@ def get_session(
     session_id: UUID,
     repository: SessionRepository = Depends(get_repository),
     graphs: dict[str, FaultGraph] = Depends(get_graphs),
+    store: ManualStore = Depends(get_manual_store),
 ) -> SessionView:
     record = _require_session(session_id, repository)
     graph = _graph_for_session(record, graphs)
-    return _session_view(record, repository, graph)
+    return _session_view(record, repository, graph, store)
 
 
 @router.post("/sessions/{session_id}/facts", response_model=SessionView)
@@ -84,6 +90,7 @@ def report_facts(
     payload: FactsReport,
     repository: SessionRepository = Depends(get_repository),
     graphs: dict[str, FaultGraph] = Depends(get_graphs),
+    store: ManualStore = Depends(get_manual_store),
 ) -> SessionView:
     record = _require_session(session_id, repository)
     graph = _graph_for_session(record, graphs)
@@ -105,7 +112,7 @@ def report_facts(
         "facts_reported",
         {"facts": payload.facts, "check_id": payload.check_id},
     )
-    return _session_view(record, repository, graph)
+    return _session_view(record, repository, graph, store)
 
 
 @router.post(
@@ -118,6 +125,7 @@ def report_observation(
     repository: SessionRepository = Depends(get_repository),
     graphs: dict[str, FaultGraph] = Depends(get_graphs),
     parser: ObservationParser = Depends(get_parser),
+    store: ManualStore = Depends(get_manual_store),
 ) -> ObservationResponse:
     record = _require_session(session_id, repository)
     graph = _graph_for_session(record, graphs)
@@ -157,7 +165,7 @@ def report_observation(
         },
     )
 
-    view = _session_view(record, repository, graph)
+    view = _session_view(record, repository, graph, store)
     return ObservationResponse(
         id=view.id,
         fault_id=view.fault_id,
@@ -177,6 +185,7 @@ def undo_event(
     payload: UndoRequest,
     repository: SessionRepository = Depends(get_repository),
     graphs: dict[str, FaultGraph] = Depends(get_graphs),
+    store: ManualStore = Depends(get_manual_store),
 ) -> SessionView:
     record = _require_session(session_id, repository)
     graph = _graph_for_session(record, graphs)
@@ -201,7 +210,7 @@ def undo_event(
         )
 
     _append_or_409(repository, session_id, "undo", {"target_event_id": target.id})
-    return _session_view(record, repository, graph)
+    return _session_view(record, repository, graph, store)
 
 
 @router.post("/sessions/{session_id}/close", response_model=SessionView)
@@ -209,6 +218,7 @@ def close_session(
     session_id: UUID,
     repository: SessionRepository = Depends(get_repository),
     graphs: dict[str, FaultGraph] = Depends(get_graphs),
+    store: ManualStore = Depends(get_manual_store),
 ) -> SessionView:
     record = _require_session(session_id, repository)
     graph = _graph_for_session(record, graphs)
@@ -216,13 +226,14 @@ def close_session(
     _reject_if_closed(events)
 
     _append_or_409(repository, session_id, "closed", {})
-    return _session_view(record, repository, graph)
+    return _session_view(record, repository, graph, store)
 
 
 def _session_view(
     record: SessionRecord,
     repository: SessionRepository,
     graph: FaultGraph,
+    store: ManualStore,
 ) -> SessionView:
     events = repository.list_events(record.id)
     facts = replay_facts(events)
@@ -237,6 +248,8 @@ def _session_view(
             ),
         ) from error
 
+    state = _attach_evidence(state, store)
+
     return SessionView(
         id=record.id,
         fault_id=record.fault_id,
@@ -245,6 +258,25 @@ def _session_view(
         created_at=record.created_at,
         events=events,
         state=state,
+    )
+
+
+def _attach_evidence(state: DiagnosticState, store: ManualStore) -> DiagnosticState:
+    """API-layer only: attach verbatim manual passages to check / root_cause actions."""
+    action = state.next_action
+    if action.type not in ("check", "root_cause") or action.source is None:
+        return state
+
+    if action.type == "check" and action.check is not None:
+        query = action.check.instruction
+    else:
+        query = action.message
+
+    evidence = get_evidence(action.source, query, store=store)
+    return state.model_copy(
+        update={
+            "next_action": action.model_copy(update={"evidence": evidence}),
+        }
     )
 
 
