@@ -7,6 +7,9 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.engine.engine import DiagnosticState
+from app.parser.base import ParseResult
+
+MAX_OBSERVATION_TEXT_LENGTH = 2000
 
 
 class SessionCreate(BaseModel):
@@ -30,6 +33,25 @@ class FactsReport(BaseModel):
 
     facts: dict[str, Any]
     check_id: str | None = None
+
+
+class ObservationReport(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    text: str = Field(..., min_length=1, max_length=MAX_OBSERVATION_TEXT_LENGTH)
+    check_id: str | None = None
+
+    @field_validator("text")
+    @classmethod
+    def strip_and_reject_blank_text(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("must not be blank")
+        if len(stripped) > MAX_OBSERVATION_TEXT_LENGTH:
+            raise ValueError(
+                f"must be at most {MAX_OBSERVATION_TEXT_LENGTH} characters"
+            )
+        return stripped
 
 
 class UndoRequest(BaseModel):
@@ -59,3 +81,12 @@ class SessionView(BaseModel):
     created_at: datetime
     events: list[Event]
     state: DiagnosticState
+
+
+class ObservationResponse(SessionView):
+    """Session view plus the parse result for UI feedback."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    parse: ParseResult
+    message: str | None = None

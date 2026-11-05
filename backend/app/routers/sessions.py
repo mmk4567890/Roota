@@ -12,10 +12,15 @@ from app.graphs.loader import get_graphs
 from app.models import (
     Event,
     FactsReport,
+    ObservationReport,
+    ObservationResponse,
     SessionCreate,
     SessionView,
     UndoRequest,
 )
+from app.parser.base import ObservationParser, ParseError, ParseResult
+from app.parser.fake import KeywordParser
+from app.parser.validate import validate_parse
 from app.repository import (
     EventAlreadyUndoneError,
     SessionClosedError,
@@ -29,6 +34,11 @@ router = APIRouter(tags=["sessions"])
 def get_repository() -> SessionRepository:
     """Overridden in main with the shared SQLite repository."""
     raise RuntimeError("Repository dependency was not configured")
+
+
+def get_parser() -> ObservationParser:
+    """Overridden in main with the configured observation parser."""
+    return KeywordParser()
 
 
 @router.post(
@@ -94,6 +104,69 @@ def report_facts(
         {"facts": payload.facts, "check_id": payload.check_id},
     )
     return _session_view(record, repository, graph)
+
+
+@router.post(
+    "/sessions/{session_id}/observations",
+    response_model=ObservationResponse,
+)
+def report_observation(
+    session_id: UUID,
+    payload: ObservationReport,
+    repository: SessionRepository = Depends(get_repository),
+    graphs: dict[str, FaultGraph] = Depends(get_graphs),
+    parser: ObservationParser = Depends(get_parser),
+) -> ObservationResponse:
+    record = _require_session(session_id, repository)
+    graph = _graph_for_session(record, graphs)
+    events = repository.list_events(session_id)
+    _reject_if_closed(events)
+
+    if payload.check_id is not None:
+        check = next((item for item in graph.checks if item.id == payload.check_id), None)
+        if check is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=f"Unknown check_id '{payload.check_id}'",
+            )
+        expected_fields = list(check.collects)
+    else:
+        expected_fields = _expected_fields_from_state(graph, events)
+
+    try:
+        raw = parser.parse(payload.text, graph, expected_fields)
+        parsed = validate_parse(raw, graph)
+    except ParseError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(error),
+        ) from error
+
+    _append_or_409(
+        repository,
+        session_id,
+        "observation",
+        {
+            "text": payload.text,
+            "check_id": payload.check_id,
+            "extracted": parsed.extracted,
+            "unclear_fields": parsed.unclear_fields,
+            "rejected": [item.model_dump() for item in parsed.rejected],
+        },
+    )
+
+    view = _session_view(record, repository, graph)
+    return ObservationResponse(
+        id=view.id,
+        fault_id=view.fault_id,
+        equipment_label=view.equipment_label,
+        status=view.status,
+        created_at=view.created_at,
+        events=view.events,
+        state=view.state,
+        parse=parsed,
+        message=_observation_message(parsed),
+    )
 
 
 @router.post("/sessions/{session_id}/undo", response_model=SessionView)
@@ -257,3 +330,32 @@ def _reject_if_closed(events: list[Event]) -> None:
             status_code=status.HTTP_409_CONFLICT,
             detail="Session is closed",
         )
+
+
+def _expected_fields_from_state(
+    graph: FaultGraph, events: list[Event]
+) -> list[str]:
+    facts = replay_facts(events)
+    state = evaluate(graph, facts)
+    if state.next_action.type == "check" and state.next_action.check is not None:
+        return list(state.next_action.check.collects)
+    if state.next_action.fields:
+        return list(state.next_action.fields)
+    return []
+
+
+def _observation_message(parsed: ParseResult) -> str | None:
+    if parsed.rejected:
+        parts = [
+            f"{item.field} ({item.reason})" for item in parsed.rejected
+        ]
+        return (
+            "Some values could not be used — please re-phrase: "
+            + "; ".join(parts)
+        )
+    if not parsed.extracted and not parsed.unclear_fields:
+        return (
+            "I didn't understand any diagnostic field values in that observation. "
+            "Please re-phrase using clearer measurements or statuses."
+        )
+    return None

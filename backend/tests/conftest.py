@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from app import main as main_module
 from app.main import app
+from app.parser.fake import KeywordParser
 from app.repository import SQLiteSessionRepository
 from app.routers import sessions
 
@@ -22,5 +23,8 @@ def repository(tmp_path: Path) -> Iterator[SQLiteSessionRepository]:
 
 @pytest.fixture
 def client(repository: SQLiteSessionRepository) -> Iterator[TestClient]:
+    # Tests must never call the real Anthropic API; default to KeywordParser.
+    app.dependency_overrides[sessions.get_parser] = lambda: KeywordParser()
     with TestClient(app) as test_client:
         yield test_client
+    app.dependency_overrides[sessions.get_parser] = lambda: main_module.parser
