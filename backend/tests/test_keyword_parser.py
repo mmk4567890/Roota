@@ -3,13 +3,14 @@ from __future__ import annotations
 import pytest
 
 from app.engine.schema import FaultGraph
-from app.graphs.loader import DEFAULT_GRAPHS_DIR, load_graphs
+from app.graphs.loader import load_graphs
+from tests.graph_fixtures import TEST_GRAPHS_DIR
 from app.parser.fake import KeywordParser
 
 
 @pytest.fixture(scope="module")
 def overtemperature() -> FaultGraph:
-    return load_graphs(DEFAULT_GRAPHS_DIR)["overtemperature"]
+    return load_graphs(TEST_GRAPHS_DIR)["overtemperature"]
 
 
 @pytest.fixture
@@ -85,7 +86,11 @@ def test_explicit_load_percent(
 def test_unsupported_graph_returns_empty(
     parser: KeywordParser, overtemperature: FaultGraph
 ) -> None:
-    other = overtemperature.model_copy(update={"fault_id": "other_fault"})
-    result = parser.parse("fan is fine", other, ["fan_status"])
+    renamed = [
+        field.model_copy(update={"name": f"other_{field.name}"})
+        for field in overtemperature.fields
+    ]
+    other = overtemperature.model_copy(update={"fault_id": "other_fault", "fields": renamed})
+    result = parser.parse("fan is fine", other, ["other_fan_status"])
     assert result.extracted == {}
-    assert "only supports" in result.notes
+    assert "knows none of the fields of fault_id 'other_fault'" in result.notes

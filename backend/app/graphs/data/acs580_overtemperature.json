@@ -1,0 +1,214 @@
+{
+  "fault_id": "acs580_overtemperature",
+  "equipment": "vfd",
+  "display_name": "ABB ACS580 drive overtemperature",
+  "_todo": "Source: ABB ACS580 standard control program firmware manual, 3AXD50000016097 Rev J (doc_id abb_acs580_fw). Pages are PDF page numbers; ABB's printed page numbers are PDF page + 2. Excluded on purpose: 4380/A4B1 Excess temperature difference (cause is motor cabling, a different isolation path), 4110 Control board temperature, 4981/4982 External temperature, 4991 Safe motor temperature.",
+  "fault_codes": ["4210", "42F1", "4290", "4310", "A4A1", "A4F6", "A4A9", "A4B0"],
+  "description": "ACS580 faults 4210 IGBT overtemperature, 42F1 IGBT temperature, 4290 Cooling, 4310 Excess temperature and their warnings A4A1, A4F6, A4A9, A4B0. The manual gives the same isolation steps for all of them: ambient conditions, cooling air flow and fan operation, heatsink dust, and motor power against drive power.",
+  "fields": [
+    {
+      "name": "fan_status",
+      "type": "enum",
+      "values": ["normal", "not_running", "noisy", "unclear"],
+      "unit": null,
+      "description": "Operation of the drive's cooling fan. On frame R6 and larger the drive also reports missing fan feedback as warning A581 Fan / fault 5080 Fan.",
+      "ask": "Is the drive's cooling fan running normally, not running, or running but noisy?"
+    },
+    {
+      "name": "airflow_obstruction",
+      "type": "enum",
+      "values": ["none", "partial", "blocked", "unclear"],
+      "unit": null,
+      "description": "Whether the drive module's cooling air flow (inlet, outlet, cabinet air path) is obstructed.",
+      "ask": "Is the drive's cooling air path clear, partly obstructed, or blocked?"
+    },
+    {
+      "name": "heatsink_condition",
+      "type": "enum",
+      "values": ["clean", "dusty", "unclear"],
+      "unit": null,
+      "description": "Dust pick-up on the heatsink fins of the drive module and inside the cabinet.",
+      "ask": "Are the heatsink fins (and the inside of the cabinet) clean, or is there dust pick-up?"
+    },
+    {
+      "name": "ambient_above_derating_temp",
+      "type": "enum",
+      "values": ["yes", "no", "unclear"],
+      "unit": null,
+      "description": "Whether the ambient temperature exceeds the temperature above which the drive must be derated. The manual (fault 4290) gives 40 °C / 104 °F and 50 °C / 122 °F for IP21 frames and refers to the Hardware manual, chapter Technical data, section Derating, for the exact limit and for IP55 frames. TODO(roota): the 4290 text gives overlapping frame ranges (R4...R9 for 40 °C, R1...R9 for 50 °C); confirm the per-frame limit from the hardware manual before encoding a temperature.",
+      "ask": "Is the ambient temperature above the drive's derating temperature (40 °C / 104 °F or 50 °C / 122 °F depending on IP21 frame; see the Derating section of the hardware manual)?"
+    },
+    {
+      "name": "load_within_derated_capacity",
+      "type": "enum",
+      "values": ["yes", "no", "unclear"],
+      "unit": null,
+      "description": "Whether the drive's load current stays within its derated load capacity at the present ambient temperature (Hardware manual, Technical data, Derating).",
+      "ask": "At this ambient temperature, does the load current stay within the drive's derated load capacity?"
+    },
+    {
+      "name": "motor_power_vs_drive",
+      "type": "enum",
+      "values": ["within", "exceeds", "unclear"],
+      "unit": null,
+      "description": "Motor power compared with drive power, as the manual's 'Check motor power against drive power' step asks.",
+      "ask": "Compared with the drive's power rating, is the motor's power within it or does it exceed it?"
+    }
+  ],
+  "checks": [
+    {
+      "id": "check_fan_operation",
+      "instruction": "With the drive powered, check that the cooling fan operates. On frame R6 and larger, also look for warning A581 Fan or fault 5080 Fan: its auxiliary code identifies the fan.",
+      "reason": "For every overtemperature fault the manual's first steps include 'Check air flow and fan operation'.",
+      "collects": ["fan_status"],
+      "source": {
+        "doc_id": "abb_acs580_fw",
+        "section": "Fault tracing: 4210 IGBT overtemperature (printed p. 556)",
+        "page": 554
+      }
+    },
+    {
+      "id": "check_airflow_path",
+      "instruction": "Check the drive module's cooling air flow: inlet, outlet and the air path through the cabinet must be clear.",
+      "reason": "The manual's 4290 Cooling entry says 'Check drive module cooling air flow and fan operation'.",
+      "collects": ["airflow_obstruction"],
+      "source": {
+        "doc_id": "abb_acs580_fw",
+        "section": "Fault tracing: 4290 Cooling (printed p. 557)",
+        "page": 555
+      }
+    },
+    {
+      "id": "check_heatsink_cleanliness",
+      "instruction": "Check the heatsink fins of the drive module, and the inside of the cabinet, for dust pick-up.",
+      "reason": "The manual lists 'Check heatsink fins for dust pick-up' for 4210, 42F1 and 4310.",
+      "collects": ["heatsink_condition"],
+      "source": {
+        "doc_id": "abb_acs580_fw",
+        "section": "Fault tracing: 4210 IGBT overtemperature (printed p. 556)",
+        "page": 554
+      }
+    },
+    {
+      "id": "check_ambient_temperature",
+      "instruction": "Check the ambient temperature at the drive against its derating temperature (40 °C / 104 °F or 50 °C / 122 °F depending on IP21 frame; for IP55 frames see the derating temperatures in the hardware manual).",
+      "reason": "4290 Cooling: if the ambient exceeds the derating temperature, the load current must not exceed the drive's derated load capacity.",
+      "collects": ["ambient_above_derating_temp"],
+      "source": {
+        "doc_id": "abb_acs580_fw",
+        "section": "Fault tracing: 4290 Cooling (printed p. 557)",
+        "page": 555
+      }
+    },
+    {
+      "id": "check_derated_load",
+      "instruction": "With the ambient above the derating temperature, check that the load current does not exceed the drive's derated load capacity (Hardware manual, chapter Technical data, section Derating).",
+      "reason": "4290 Cooling: 'ensure that load current does not exceed derated load capacity of drive'.",
+      "collects": ["load_within_derated_capacity"],
+      "source": {
+        "doc_id": "abb_acs580_fw",
+        "section": "Fault tracing: 4290 Cooling (printed p. 557)",
+        "page": 555
+      }
+    },
+    {
+      "id": "check_motor_vs_drive_power",
+      "instruction": "Compare the motor's power rating with the drive's power rating.",
+      "reason": "The manual lists 'Check motor power against drive power' for 4210, 42F1 and 4310.",
+      "collects": ["motor_power_vs_drive"],
+      "source": {
+        "doc_id": "abb_acs580_fw",
+        "section": "Fault tracing: 4210 IGBT overtemperature (printed p. 556)",
+        "page": 554
+      }
+    }
+  ],
+  "causes": [
+    {
+      "id": "cooling_fan_failure",
+      "name": "Cooling fan not operating",
+      "priority": 1,
+      "checks": ["check_fan_operation"],
+      "ruled_out_when": {"field": "fan_status", "op": "eq", "value": "normal"},
+      "confirmed_when": {
+        "field": "fan_status",
+        "op": "eq",
+        "value": "not_running",
+        "_todo": "TODO(roota): the manual does not say whether a running but noisy fan counts as faulty, so 'noisy' neither confirms nor rules out this cause and the session escalates. Confirm with ABB service guidance."
+      },
+      "promote_when": null,
+      "corrective_action": "Check fan operation and connection, and replace the fan if faulty. On frame R6 and larger, read the auxiliary code of warning A581 / fault 5080 to identify the fan (0 = main fan 1; otherwise the last digit is the fan index).",
+      "action_source": {
+        "doc_id": "abb_acs580_fw",
+        "section": "Fault tracing: A581 Fan (printed p. 543)",
+        "page": 541
+      }
+    },
+    {
+      "id": "blocked_airflow",
+      "name": "Obstructed cooling air flow or dusty heatsink",
+      "priority": 2,
+      "checks": ["check_airflow_path", "check_heatsink_cleanliness"],
+      "ruled_out_when": {
+        "all": [
+          {"field": "airflow_obstruction", "op": "eq", "value": "none"},
+          {"field": "heatsink_condition", "op": "eq", "value": "clean"}
+        ]
+      },
+      "confirmed_when": {
+        "any": [
+          {"field": "airflow_obstruction", "op": "in", "value": ["partial", "blocked"]},
+          {"field": "heatsink_condition", "op": "eq", "value": "dusty"}
+        ]
+      },
+      "promote_when": null,
+      "corrective_action": "Restore clear cooling air flow through the drive module, then check the inside of the cabinet and the heatsink of the drive module for dust pick-up and clean them.",
+      "action_source": {
+        "doc_id": "abb_acs580_fw",
+        "section": "Fault tracing: 4290 Cooling (printed p. 557)",
+        "page": 555
+      }
+    },
+    {
+      "id": "load_above_derated_capacity",
+      "name": "Ambient above derating temperature with load over derated capacity",
+      "priority": 3,
+      "checks": ["check_ambient_temperature", "check_derated_load"],
+      "ruled_out_when": {
+        "any": [
+          {"field": "ambient_above_derating_temp", "op": "eq", "value": "no"},
+          {"field": "load_within_derated_capacity", "op": "eq", "value": "yes"}
+        ]
+      },
+      "confirmed_when": {
+        "all": [
+          {"field": "ambient_above_derating_temp", "op": "eq", "value": "yes"},
+          {"field": "load_within_derated_capacity", "op": "eq", "value": "no"}
+        ]
+      },
+      "promote_when": null,
+      "corrective_action": "At this ambient temperature the load current must not exceed the drive's derated load capacity. Bring the load current within that capacity, using the derating figures in the Hardware manual, chapter Technical data, section Derating.",
+      "action_source": {
+        "doc_id": "abb_acs580_fw",
+        "section": "Fault tracing: 4290 Cooling (printed p. 557)",
+        "page": 555
+      }
+    },
+    {
+      "id": "motor_exceeds_drive_power",
+      "name": "Motor power exceeds drive power",
+      "priority": 4,
+      "checks": ["check_motor_vs_drive_power"],
+      "ruled_out_when": {"field": "motor_power_vs_drive", "op": "eq", "value": "within"},
+      "confirmed_when": {"field": "motor_power_vs_drive", "op": "eq", "value": "exceeds"},
+      "promote_when": null,
+      "corrective_action": "The motor's power exceeds the drive's power, so the drive is too small for this motor. The firmware manual only says to check motor power against drive power; resolve the mismatch between motor and drive ratings before returning to service.",
+      "action_source": {
+        "doc_id": "abb_acs580_fw",
+        "section": "Fault tracing: 4210 IGBT overtemperature (printed p. 556)",
+        "page": 554,
+        "_todo": "TODO(roota): the firmware manual gives no corrective procedure for an undersized drive (resize, derate, or reduce load). Confirm the recommended action with the hardware manual or ABB."
+      }
+    }
+  ]
+}

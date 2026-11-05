@@ -9,7 +9,8 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from app.engine.schema import FaultGraph
-from app.graphs.loader import DEFAULT_GRAPHS_DIR, clear_graph_cache, get_graph, load_graphs
+from app.graphs.loader import clear_graph_cache, get_graph, load_graphs
+from tests.graph_fixtures import TEST_GRAPHS_DIR
 
 
 def _minimal_graph(**overrides: Any) -> dict[str, Any]:
@@ -68,9 +69,9 @@ def _minimal_graph(**overrides: Any) -> dict[str, Any]:
     return graph
 
 
-def test_sample_overtemperature_graph_loads() -> None:
+def test_fixture_overtemperature_graph_loads() -> None:
     clear_graph_cache()
-    graphs = load_graphs(DEFAULT_GRAPHS_DIR)
+    graphs = load_graphs(TEST_GRAPHS_DIR)
     assert "overtemperature" in graphs
     graph = graphs["overtemperature"]
     assert graph.fault_id == "overtemperature"
@@ -315,7 +316,7 @@ def test_loader_names_the_invalid_file(tmp_path: Any) -> None:
 def test_sample_load_promotion_redirects_without_confirming() -> None:
     # Scenario 3: near-rated load must redirect the investigation (promote),
     # not conclude it. Promotion and confirmation must therefore differ.
-    graph = load_graphs(DEFAULT_GRAPHS_DIR)["overtemperature"]
+    graph = load_graphs(TEST_GRAPHS_DIR)["overtemperature"]
     excessive_load = next(cause for cause in graph.causes if cause.id == "excessive_load")
     assert excessive_load.promote_when is not None
     assert excessive_load.promote_when != excessive_load.confirmed_when

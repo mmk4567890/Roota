@@ -12,7 +12,9 @@ from app.parser.fake import KeywordParser
 from app.repository import SQLiteSessionRepository
 from app.retrieval.embeddings import FakeEmbeddingFunction
 from app.retrieval.store import ManualStore
+from app.graphs import loader as graph_loader
 from app.routers import docs, sessions
+from tests.graph_fixtures import all_graphs
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -34,6 +36,21 @@ def pytest_collection_modifyitems(
         path = Path(str(item.fspath))
         if "live" in path.parts:
             item.add_marker(skip_live)
+
+
+@pytest.fixture(autouse=True)
+def serve_test_graphs() -> Iterator[None]:
+    """Every API test sees the shipped graphs plus the test-only ones.
+
+    Autouse so tests that build their own TestClient get them too. A test may
+    still install its own get_graphs override; this restores none afterwards.
+    """
+    graphs = all_graphs()
+    app.dependency_overrides[graph_loader.get_graphs] = lambda: graphs
+    try:
+        yield
+    finally:
+        app.dependency_overrides.pop(graph_loader.get_graphs, None)
 
 
 @pytest.fixture

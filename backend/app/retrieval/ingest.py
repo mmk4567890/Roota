@@ -16,6 +16,12 @@ CHUNK_OVERLAP = 150
 # must start with a capitalised word of 3+ letters so spec lines such as
 # "1.5 kW rated output" or "2.2 Nm on terminals" are not taken for headings.
 # TODO(roota): tune against the real manual's heading style once it is chosen.
+# A fault or warning table entry starts a line with its 4-digit hex code and a
+# capitalised name ("4210 IGBT overtemperature", "A581 Fan"). Auxiliary codes
+# under an entry ("0002 Motor is rotating ...") start with 000 and stay with
+# their parent entry. Chunks start at entries so a cited passage opens at its
+# own fault code instead of mid-way through the previous one.
+ENTRY_START_RE = re.compile(r"^(?!000)[0-9A-F]{4} [A-Z]", re.MULTILINE)
 SECTION_HEADING_RE = re.compile(r"^\d+(?:\.\d+)+\s+[A-Z][A-Za-z]{2,}.*$")
 
 
@@ -88,27 +94,35 @@ def chunk_page_text(
         return []
 
     chunks: list[StoredChunk] = []
-    start = 0
     index = 0
-    length = len(page_text)
-    while start < length:
-        end = min(start + chunk_size, length)
-        piece = page_text[start:end]
-        chunks.append(
-            StoredChunk(
-                chunk_id=f"{doc_id}::p{page}::c{index}",
-                doc_id=doc_id,
-                title=title,
-                page=page,
-                section=detect_section(page_text, end),
-                text=piece,
-            )
-        )
-        index += 1
-        if end >= length:
-            break
-        start = end - overlap
+    for segment_start, segment_end in _entry_segments(page_text):
+        start = segment_start
+        while start < segment_end:
+            end = min(start + chunk_size, segment_end)
+            piece = page_text[start:end]
+            if piece.strip():
+                chunks.append(
+                    StoredChunk(
+                        chunk_id=f"{doc_id}::p{page}::c{index}",
+                        doc_id=doc_id,
+                        title=title,
+                        page=page,
+                        section=detect_section(page_text, end),
+                        text=piece,
+                    )
+                )
+                index += 1
+            if end >= segment_end:
+                break
+            start = end - overlap
     return chunks
+
+
+def _entry_segments(page_text: str) -> list[tuple[int, int]]:
+    """Split a page at fault/warning entry starts; the page itself if none."""
+    starts = [match.start() for match in ENTRY_START_RE.finditer(page_text)]
+    bounds = sorted({0, *starts})
+    return list(zip(bounds, [*bounds[1:], len(page_text)], strict=True))
 
 
 def build_chunks(

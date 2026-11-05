@@ -7,7 +7,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.engine.schema import FaultGraph
-from app.graphs.loader import DEFAULT_GRAPHS_DIR, load_graphs
+from app.graphs.loader import load_graphs
+from tests.graph_fixtures import TEST_GRAPHS_DIR
 from app.main import app
 from app.models import MAX_OBSERVATION_TEXT_LENGTH
 from app.parser.anthropic_parser import (
@@ -24,7 +25,7 @@ from app.routers import sessions
 
 @pytest.fixture
 def overtemperature() -> FaultGraph:
-    return load_graphs(DEFAULT_GRAPHS_DIR)["overtemperature"]
+    return load_graphs(TEST_GRAPHS_DIR)["overtemperature"]
 
 
 def _create_session(client: TestClient) -> dict:

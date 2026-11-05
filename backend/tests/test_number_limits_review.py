@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from app.engine.schema import FaultGraph
-from app.graphs.loader import DEFAULT_GRAPHS_DIR
+from tests.graph_fixtures import TEST_GRAPHS_DIR
 from app.parser.base import ParseResult
 from app.routers import sessions
 
@@ -80,7 +80,7 @@ def test_parser_integer_beyond_float_range_is_rejected_not_500(client: TestClien
 
 def _graph_with_threshold(value: object) -> dict:
     raw = json.loads(
-        (Path(DEFAULT_GRAPHS_DIR) / "overtemperature.json").read_text(encoding="utf-8")
+        (Path(TEST_GRAPHS_DIR) / "overtemperature.json").read_text(encoding="utf-8")
     )
     graph = copy.deepcopy(raw)
     for cause in graph["causes"]:

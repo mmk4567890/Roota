@@ -11,7 +11,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.engine.schema import Source
-from app.graphs.loader import DEFAULT_GRAPHS_DIR, load_graphs
+from app.graphs.loader import load_graphs
+from tests.graph_fixtures import TEST_GRAPHS_DIR
 from app.retrieval.citations import check_citations
 from app.retrieval.embeddings import FakeEmbeddingFunction
 from app.retrieval.evidence import get_evidence
@@ -138,7 +139,7 @@ def test_failed_reingest_marks_doc_not_ingested(
     assert store.count_chunks("scan") == 0
     assert store.has_doc("scan") is False
     assert get_evidence(Source(doc_id="scan", section="", page=1), "fan", store=store) == []
-    graphs = load_graphs(DEFAULT_GRAPHS_DIR)
+    graphs = load_graphs(TEST_GRAPHS_DIR)
     graph = graphs["overtemperature"]
     cited = graph.checks[0].model_copy(
         update={"source": Source(doc_id="scan", section="", page=1)}
@@ -154,7 +155,7 @@ def test_citation_to_scanned_page_is_reported(
     store: ManualStore, blank_page_pdf: Path
 ) -> None:
     ingest_pdf(blank_page_pdf, doc_id="scan", title="Scan", store=store)
-    graphs = load_graphs(DEFAULT_GRAPHS_DIR)
+    graphs = load_graphs(TEST_GRAPHS_DIR)
     graph = graphs["overtemperature"]
     cited = graph.checks[0].model_copy(
         update={"source": Source(doc_id="scan", section="", page=2)}
@@ -190,8 +191,18 @@ def test_check_citations_script_ignores_collection_embedding(
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
 
-    # The shipped graphs cite TBD_MANUAL only, so a clean run exits 0.
-    assert module.main(["--docs-db", str(tmp_path / "real-docs.db")]) == 0
+    # The test graphs cite TBD_MANUAL only, so a clean run exits 0.
+    assert (
+        module.main(
+            [
+                "--docs-db",
+                str(tmp_path / "real-docs.db"),
+                "--graphs-dir",
+                str(TEST_GRAPHS_DIR),
+            ]
+        )
+        == 0
+    )
 
 
 # --- dependencies: no process-wide fallback store ---

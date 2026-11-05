@@ -7,7 +7,8 @@ import time
 
 import pytest
 
-from app.graphs.loader import DEFAULT_GRAPHS_DIR, load_graphs
+from app.graphs.loader import load_graphs
+from tests.graph_fixtures import TEST_GRAPHS_DIR
 from app.parser.anthropic_parser import AnthropicParser
 from app.parser.validate import validate_parse
 
@@ -16,7 +17,7 @@ REQUEST_TIMEOUT_SECONDS = 90
 
 @pytest.fixture(scope="module")
 def overtemperature():
-    return load_graphs(DEFAULT_GRAPHS_DIR)["overtemperature"]
+    return load_graphs(TEST_GRAPHS_DIR)["overtemperature"]
 
 
 @pytest.fixture(scope="module")

@@ -16,13 +16,15 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.graphs.loader import DEFAULT_GRAPHS_DIR, load_graphs
+from app.graphs.loader import load_graphs
 from app.parser.anthropic_parser import AnthropicParser
 from app.parser.fake import KeywordParser
 from app.parser.base import ParseError
 from app.parser.validate import validate_parse
 
 DEFAULT_CASES = BACKEND_ROOT / "tests" / "parser_eval" / "cases.jsonl"
+# cases.jsonl is written for the generic test graph (tests/fixtures/graphs).
+DEFAULT_GRAPHS_DIR = BACKEND_ROOT / "tests" / "fixtures" / "graphs"
 
 
 def _load_cases(path: Path) -> list[dict]:
@@ -74,6 +76,12 @@ def main() -> int:
         help="Fault graph id to evaluate against",
     )
     parser.add_argument(
+        "--graphs-dir",
+        type=Path,
+        default=DEFAULT_GRAPHS_DIR,
+        help=f"Directory of fault graphs (default: {DEFAULT_GRAPHS_DIR})",
+    )
+    parser.add_argument(
         "--limit",
         type=int,
         default=None,
@@ -82,7 +90,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    graphs = load_graphs(DEFAULT_GRAPHS_DIR)
+    graphs = load_graphs(args.graphs_dir)
     if args.fault_id not in graphs:
         raise SystemExit(f"Unknown fault_id '{args.fault_id}'")
     graph = graphs[args.fault_id]

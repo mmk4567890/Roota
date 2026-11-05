@@ -282,12 +282,17 @@ class ManualStore:
         query: str,
         *,
         doc_id: str | None = None,
+        page: int | None = None,
         k: int = 5,
         exclude_ids: set[str] | None = None,
     ) -> list[StoredChunk]:
         if k < 1:
             raise ValueError("k must be >= 1")
+        if page is not None and not doc_id:
+            raise ValueError("page filter requires doc_id")
         where: dict[str, Any] | None = {"doc_id": doc_id} if doc_id else None
+        if page is not None:
+            where = {"$and": [{"doc_id": doc_id}, {"page": page}]}
         # Fetch extra when excluding so we can still return k results.
         exclude = exclude_ids or set()
         n_results = k + len(exclude)

@@ -92,3 +92,25 @@ def test_live_default_embeddings_ingest_and_evidence(tmp_path: Path) -> None:
     assert again
     assert again[0].kind == "cited"
     assert again[0].page == 1
+
+
+def test_live_shipped_citations_open_on_their_entry() -> None:
+    """With the real ACS580 manual ingested, each citation's first passage is its entry."""
+    import re
+
+    import pytest
+
+    from app.graphs.loader import DEFAULT_GRAPHS_DIR, load_graphs
+
+    store = ManualStore()  # default dirs: the manual ingested per README
+    if not store.has_doc("abb_acs580_fw"):
+        pytest.skip("abb_acs580_fw is not ingested (see README, Manuals)")
+    graph = load_graphs(DEFAULT_GRAPHS_DIR)["acs580_overtemperature"]
+    citations = [(check.source, check.instruction) for check in graph.checks]
+    citations += [(cause.action_source, cause.corrective_action) for cause in graph.causes]
+    for source, query in citations:
+        code = re.search(r"\b[0-9A-F]{4}\b", source.section)
+        assert code is not None, source.section
+        evidence = get_evidence(source, query, store=store)
+        assert evidence[0].kind == "cited"
+        assert evidence[0].text.lstrip().startswith(code.group(0)), (source.section, evidence[0].text[:60])

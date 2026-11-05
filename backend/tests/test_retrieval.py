@@ -9,7 +9,8 @@ from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 
 from app.engine.schema import Source
-from app.graphs.loader import DEFAULT_GRAPHS_DIR, load_graphs
+from app.graphs.loader import load_graphs
+from tests.graph_fixtures import TEST_GRAPHS_DIR
 from app.main import app
 from app.retrieval.citations import check_citations
 from app.retrieval.embeddings import FakeEmbeddingFunction
@@ -256,7 +257,7 @@ def test_session_attaches_evidence_for_check(
     client: TestClient, fake_store: ManualStore, sample_pdf: Path
 ) -> None:
     ingest_pdf(sample_pdf, doc_id="demo_manual", title="Demo Manual", store=fake_store)
-    graphs = load_graphs(DEFAULT_GRAPHS_DIR)
+    graphs = load_graphs(TEST_GRAPHS_DIR)
     graph = graphs["overtemperature"]
     checks = []
     for check in graph.checks:
@@ -307,7 +308,7 @@ def test_check_citations_reports_missing_doc_and_page(fake_store: ManualStore) -
         page_count=1,
         empty_pages=[],
     )
-    graphs = load_graphs(DEFAULT_GRAPHS_DIR)
+    graphs = load_graphs(TEST_GRAPHS_DIR)
     graph = graphs["overtemperature"]
     checks = [
         graph.checks[0].model_copy(
@@ -328,7 +329,7 @@ def test_check_citations_reports_missing_doc_and_page(fake_store: ManualStore) -
 
 
 def test_check_citations_skips_tbd(fake_store: ManualStore) -> None:
-    graphs = load_graphs(DEFAULT_GRAPHS_DIR)
+    graphs = load_graphs(TEST_GRAPHS_DIR)
     assert check_citations(graphs, fake_store.registry) == []
 
 
@@ -342,7 +343,7 @@ def test_check_citations_cli_exits_nonzero(
         page_count=1,
         empty_pages=[],
     )
-    graphs = load_graphs(DEFAULT_GRAPHS_DIR)
+    graphs = load_graphs(TEST_GRAPHS_DIR)
     graph = graphs["overtemperature"]
     checks = [
         graph.checks[0].model_copy(

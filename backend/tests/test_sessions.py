@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from app.engine.schema import FaultGraph
 from app.graphs import loader
 from app.main import app
+from tests.graph_fixtures import all_graphs
 
 
 def _create_session(
@@ -321,7 +322,7 @@ def test_graph_change_returns_409(
         initial_facts={"fan_status": "normal"},
     )["id"]
 
-    original = loader.get_cached_graphs()["overtemperature"]
+    original = all_graphs()["overtemperature"]
     reduced = FaultGraph.model_validate(
         {
             "fault_id": "overtemperature",

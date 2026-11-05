@@ -15,7 +15,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.engine.schema import FaultGraph
-from app.graphs.loader import DEFAULT_GRAPHS_DIR, load_graphs
+from app.graphs.loader import load_graphs
+from tests.graph_fixtures import TEST_GRAPHS_DIR
 from app.parser import anthropic_parser
 from app.parser.anthropic_parser import EFFORT, MAX_TOKENS, TOOL_NAME, AnthropicParser
 from app.parser.base import ParseError
@@ -26,7 +27,7 @@ from app.tls import system_ssl_context
 
 @pytest.fixture
 def overtemperature() -> FaultGraph:
-    return load_graphs(DEFAULT_GRAPHS_DIR)["overtemperature"]
+    return load_graphs(TEST_GRAPHS_DIR)["overtemperature"]
 
 
 def _response(stop_reason: str, tool_input: dict[str, Any] | None) -> MagicMock:

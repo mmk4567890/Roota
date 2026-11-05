@@ -13,12 +13,13 @@ from app.engine.schema import (
     FaultGraph,
     FieldCondition,
 )
-from app.graphs.loader import DEFAULT_GRAPHS_DIR, load_graphs
+from app.graphs.loader import load_graphs
+from tests.graph_fixtures import TEST_GRAPHS_DIR
 
 
 @pytest.fixture(scope="module")
 def overtemperature() -> FaultGraph:
-    graphs = load_graphs(DEFAULT_GRAPHS_DIR)
+    graphs = load_graphs(TEST_GRAPHS_DIR)
     return graphs["overtemperature"]
 
 

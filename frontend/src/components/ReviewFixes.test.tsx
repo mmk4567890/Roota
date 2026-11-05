@@ -53,8 +53,14 @@ describe("evidence passages", () => {
       />,
     );
 
+    // The most relevant chunk (first, as ordered by the API) is open; the rest
+    // of the page is folded so other faults' entries don't lead.
     expect(screen.getByText("Check air flow and fan operation.")).toBeInTheDocument();
+    expect(screen.queryByText("Check heatsink fins for dust pick-up.")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Show more from this page (1)" }));
     expect(screen.getByText("Check heatsink fins for dust pick-up.")).toBeInTheDocument();
+    // An empty section is not shown as a bare "§".
+    expect(screen.queryByText(/§/)).toBeNull();
     const keyWarnings = consoleError.mock.calls.filter((call) =>
       String(call[0]).includes("same key"),
     );

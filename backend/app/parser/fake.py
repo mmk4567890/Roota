@@ -5,15 +5,27 @@ import re
 from app.engine.schema import FaultGraph
 from app.parser.base import ParseResult
 
-# KeywordParser only covers the overtemperature demo graph.
-_OVERTEMPERATURE_FAULT_ID = "overtemperature"
+# Field names the keyword rules can fill. A graph is supported when it has at
+# least one of them (the ACS580 overtemperature graph shares the cooling ones).
+KNOWN_FIELDS = frozenset(
+    {
+        "fan_status",
+        "airflow_obstruction",
+        "heatsink_condition",
+        "load_percent",
+        "high_load_sustained",
+        "ambient_temp_c",
+        "carrier_frequency_khz",
+    }
+)
 
 
 class KeywordParser:
     """Deterministic rule-based parser for tests and offline demos.
 
-    Handles the overtemperature graph only. Rules are intentionally narrow so
-    they do not invent values the technician did not state.
+    Fills only the field names in KNOWN_FIELDS, for any graph that has them.
+    Rules are intentionally narrow so they do not invent values the technician
+    did not state.
     """
 
     def parse(
@@ -23,14 +35,15 @@ class KeywordParser:
         expected_fields: list[str],
     ) -> ParseResult:
         del expected_fields  # Keyword rules scan the whole utterance.
-        if graph.fault_id != _OVERTEMPERATURE_FAULT_ID:
+        graph_fields = {field.name for field in graph.fields}
+        if not graph_fields & KNOWN_FIELDS:
             return ParseResult(
                 extracted={},
                 unclear_fields=[],
                 rejected=[],
                 notes=(
-                    f"KeywordParser only supports fault_id "
-                    f"'{_OVERTEMPERATURE_FAULT_ID}', got '{graph.fault_id}'"
+                    f"KeywordParser knows none of the fields of fault_id "
+                    f"'{graph.fault_id}'; use direct entry or the anthropic parser"
                 ),
             )
 
@@ -44,6 +57,12 @@ class KeywordParser:
         _extract_ambient(lower, extracted)
         _extract_carrier(lower, extracted)
         _extract_high_load_sustained(lower, extracted)
+
+        # A keyword hit for a field this graph does not have is reported in the
+        # notes, not passed on as an unknown field or dropped without a word.
+        for name in sorted(set(extracted) - graph_fields):
+            notes_parts.append(f"'{name}' was mentioned but fault '{graph.fault_id}' has no such field")
+            del extracted[name]
 
         return ParseResult(
             extracted=extracted,

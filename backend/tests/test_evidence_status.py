@@ -5,7 +5,8 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from app.engine.schema import Source
-from app.graphs.loader import DEFAULT_GRAPHS_DIR, load_graphs
+from app.graphs.loader import load_graphs
+from tests.graph_fixtures import TEST_GRAPHS_DIR
 from app.main import app
 from app.retrieval.embeddings import FakeEmbeddingFunction
 from app.retrieval.ingest import ingest_pdf
@@ -71,7 +72,7 @@ def test_evidence_status_attached(
     )
     ingest_pdf(pdf, doc_id="demo_manual", title="Demo", store=store)
 
-    graphs = load_graphs(DEFAULT_GRAPHS_DIR)
+    graphs = load_graphs(TEST_GRAPHS_DIR)
     graph = graphs["overtemperature"]
     checks = [
         graph.checks[0].model_copy(
@@ -129,7 +130,7 @@ class _ChunksRaiseStore:
 def _session_with_ingested_source(
     client: TestClient, store: object
 ) -> tuple[str, str]:
-    graphs = load_graphs(DEFAULT_GRAPHS_DIR)
+    graphs = load_graphs(TEST_GRAPHS_DIR)
     graph = graphs["overtemperature"]
     checks = [
         graph.checks[0].model_copy(
