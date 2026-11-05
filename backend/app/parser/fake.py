@@ -77,8 +77,9 @@ def _extract_airflow_and_heatsink(lower: str, extracted: dict[str, object]) -> N
             extracted["heatsink_condition"] = "dusty"
 
     if airflow_mentioned:
+        # \bclear\b: "unclear" / "clearly" must not read as "no obstruction".
         if re.search(
-            r"unobstructed|clear|no\s+obstruction|not\s+obstructed|airflow\s+is\s+fine",
+            r"unobstructed|\bclear\b|no\s+obstruction|not\s+obstructed|airflow\s+is\s+fine",
             lower,
         ):
             extracted["airflow_obstruction"] = "none"
@@ -87,20 +88,8 @@ def _extract_airflow_and_heatsink(lower: str, extracted: dict[str, object]) -> N
         elif re.search(r"dust|partial|restricted|debris", lower):
             extracted["airflow_obstruction"] = "partial"
 
-    # Prompt rule: dust|clogged|blocked maps to airflow/heatsink when present.
-    dust_clog_block = bool(re.search(r"\b(dust|dusty|clogged|blocked|blockage)\b", lower))
-    if dust_clog_block:
-        if "airflow_obstruction" not in extracted and (
-            airflow_mentioned or not heatsink_mentioned
-        ):
-            if re.search(r"packed|blocked|blockage|clogged", lower):
-                extracted["airflow_obstruction"] = "blocked"
-            else:
-                extracted["airflow_obstruction"] = "partial"
-        # Dust on vents/airflow also marks heatsink dusty unless the heatsink
-        # was explicitly described as clean.
-        if "heatsink_condition" not in extracted and "clean" not in lower:
-            extracted["heatsink_condition"] = "dusty"
+    # Each field is set only when the text names that part. Dusty vents say
+    # nothing about the heatsink, and "there's dust everywhere" names neither.
 
 
 def _extract_load_percent(

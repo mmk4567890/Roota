@@ -1,5 +1,5 @@
 {"id": "fan_running_normally", "text": "The fan is running normally and the heatsink is clean.", "expected": {"fan_status": "normal", "heatsink_condition": "clean"}}
-{"id": "fan_spinning_vents_dust", "text": "Fan is spinning fine but the vents are packed with dust.", "expected": {"fan_status": "normal", "airflow_obstruction": "blocked", "heatsink_condition": "dusty"}}
+{"id": "fan_spinning_vents_dust", "text": "Fan is spinning fine but the vents are packed with dust.", "expected": {"fan_status": "normal", "airflow_obstruction": "blocked"}, "absent": ["heatsink_condition"]}
 {"id": "clean_close_to_rated", "text": "Heatsink is clean and airflow is unobstructed, but the drive is operating close to its rated load.", "expected": {"heatsink_condition": "clean", "airflow_obstruction": "none"}, "absent": ["load_percent"]}
 {"id": "fan_not_running", "text": "Cooling fan is not running.", "expected": {"fan_status": "not_running"}}
 {"id": "fan_stopped", "text": "The fan has stopped.", "expected": {"fan_status": "not_running"}}

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.engine.engine import evaluate, validate_facts
 from app.engine.replay import is_event_undone, replay_facts, session_is_closed
@@ -19,7 +19,6 @@ from app.models import (
     UndoRequest,
 )
 from app.parser.base import ObservationParser, ParseError, ParseResult
-from app.parser.fake import KeywordParser
 from app.parser.validate import validate_parse
 from app.repository import (
     EventAlreadyUndoneError,
@@ -36,9 +35,12 @@ def get_repository() -> SessionRepository:
     raise RuntimeError("Repository dependency was not configured")
 
 
-def get_parser() -> ObservationParser:
-    """Overridden in main with the configured observation parser."""
-    return KeywordParser()
+def get_parser(request: Request) -> ObservationParser:
+    """The parser main's lifespan built from ROOTA_PARSER."""
+    parser = getattr(request.app.state, "parser", None)
+    if parser is None:
+        raise RuntimeError("Observation parser was not configured")
+    return parser
 
 
 @router.post(
@@ -335,8 +337,16 @@ def _reject_if_closed(events: list[Event]) -> None:
 def _expected_fields_from_state(
     graph: FaultGraph, events: list[Event]
 ) -> list[str]:
-    facts = replay_facts(events)
-    state = evaluate(graph, facts)
+    try:
+        state = evaluate(graph, replay_facts(events))
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Stored session facts are incompatible with the current fault graph: "
+                f"{error}"
+            ),
+        ) from error
     if state.next_action.type == "check" and state.next_action.check is not None:
         return list(state.next_action.check.collects)
     if state.next_action.fields:

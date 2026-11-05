@@ -41,7 +41,8 @@ def test_fan_spinning_vents_packed_with_dust(
     )
     assert result.extracted["fan_status"] == "normal"
     assert result.extracted["airflow_obstruction"] == "blocked"
-    assert result.extracted["heatsink_condition"] == "dusty"
+    # Dusty vents say nothing about the heatsink: no inferred value.
+    assert "heatsink_condition" not in result.extracted
 
 
 def test_clean_airflow_close_to_rated_load_does_not_guess_percent(

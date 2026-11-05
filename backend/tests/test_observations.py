@@ -27,14 +27,6 @@ def overtemperature() -> FaultGraph:
     return load_graphs(DEFAULT_GRAPHS_DIR)["overtemperature"]
 
 
-@pytest.fixture(autouse=True)
-def use_keyword_parser() -> None:
-    app.dependency_overrides[sessions.get_parser] = lambda: KeywordParser()
-    yield
-    # conftest / main restore happens via other fixtures; keep keyword as default.
-    app.dependency_overrides[sessions.get_parser] = lambda: KeywordParser()
-
-
 def _create_session(client: TestClient) -> dict:
     response = client.post(
         "/sessions",

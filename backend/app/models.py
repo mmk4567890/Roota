@@ -47,10 +47,6 @@ class ObservationReport(BaseModel):
         stripped = value.strip()
         if not stripped:
             raise ValueError("must not be blank")
-        if len(stripped) > MAX_OBSERVATION_TEXT_LENGTH:
-            raise ValueError(
-                f"must be at most {MAX_OBSERVATION_TEXT_LENGTH} characters"
-            )
         return stripped
 
 

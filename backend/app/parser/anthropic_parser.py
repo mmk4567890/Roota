@@ -13,6 +13,11 @@ OBSERVATION_END = "<<<END_TECHNICIAN_OBSERVATION>>>"
 
 DEFAULT_MODEL = "claude-sonnet-5-5"
 
+# Seconds per API attempt. The SDK default is 10 minutes, which would hold the
+# technician's request open long after they gave up.
+REQUEST_TIMEOUT_SECONDS = 30.0
+MAX_RETRIES = 2
+
 
 class AnthropicParser:
     """LLM parser that translates technician text into graph field values only.
@@ -29,7 +34,9 @@ class AnthropicParser:
         model: str | None = None,
         client: Any | None = None,
     ) -> None:
-        self._model = model or os.environ.get("ROOTA_LLM_MODEL", DEFAULT_MODEL)
+        # `or` rather than a get() default: ROOTA_LLM_MODEL= (empty, as in
+        # .env.example copies) must mean the default, not model "".
+        self._model = model or os.environ.get("ROOTA_LLM_MODEL") or DEFAULT_MODEL
         self._client = client
         if self._client is None:
             # Import here so keyword-only installs do not require the SDK until used.
@@ -40,7 +47,11 @@ class AnthropicParser:
                 raise RuntimeError(
                     "ANTHROPIC_API_KEY is required when ROOTA_PARSER=anthropic"
                 )
-            self._client = anthropic.Anthropic(api_key=key)
+            self._client = anthropic.Anthropic(
+                api_key=key,
+                timeout=REQUEST_TIMEOUT_SECONDS,
+                max_retries=MAX_RETRIES,
+            )
 
     def parse(
         self,
@@ -61,8 +72,6 @@ class AnthropicParser:
                 tools=[tool],
                 tool_choice={"type": "tool", "name": TOOL_NAME},
             )
-        except ParseError:
-            raise
         except Exception as error:
             # Never include exception text that might echo credentials.
             raise ParseError(
@@ -119,7 +128,7 @@ class AnthropicParser:
             f"You may also extract any other graph field the technician clearly "
             f"states.\n\n"
             f"{OBSERVATION_BEGIN}\n"
-            f"{text}\n"
+            f"{_defuse_delimiters(text)}\n"
             f"{OBSERVATION_END}"
         )
 
@@ -140,6 +149,18 @@ class AnthropicParser:
                 return tool_input
 
         raise ParseError("Anthropic response contained no report_observation_fields tool call")
+
+
+def _defuse_delimiters(text: str) -> str:
+    """Stop the technician's text from closing the data block early.
+
+    Text containing the end marker could otherwise put words outside the
+    delimiters, where the model reads them as instructions. Only the copy sent
+    to the model is changed; the stored observation keeps the original text.
+    """
+    for marker in (OBSERVATION_BEGIN, OBSERVATION_END):
+        text = text.replace(marker, marker.replace("<<<", "< < <").replace(">>>", "> > >"))
+    return text
 
 
 def _field_schema(field: FieldSpec) -> dict[str, Any]:

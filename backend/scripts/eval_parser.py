@@ -19,6 +19,7 @@ if str(BACKEND_ROOT) not in sys.path:
 from app.graphs.loader import DEFAULT_GRAPHS_DIR, load_graphs
 from app.parser.anthropic_parser import AnthropicParser
 from app.parser.fake import KeywordParser
+from app.parser.base import ParseError
 from app.parser.validate import validate_parse
 
 DEFAULT_CASES = BACKEND_ROOT / "tests" / "parser_eval" / "cases.jsonl"
@@ -36,6 +37,15 @@ def _load_cases(path: Path) -> list[dict]:
             except json.JSONDecodeError as error:
                 raise SystemExit(f"{path}:{line_no}: invalid JSON: {error}") from error
     return cases
+
+
+def _check_fields(graph, check_id: str | None) -> list[str]:
+    if check_id is None:
+        return []
+    for check in graph.checks:
+        if check.id == check_id:
+            return list(check.collects)
+    raise SystemExit(f"Unknown check_id '{check_id}' in cases")
 
 
 def _values_match(actual: object, expected: object) -> bool:
@@ -89,10 +99,18 @@ def main() -> int:
         text = case["text"]
         expected: dict = case.get("expected") or {}
         absent: list[str] = case.get("absent") or []
-        expected_fields = list(expected.keys())
+        # The case's own check_id, never the expected keys: passing those would
+        # tell the parser which fields the answer contains.
+        expected_fields = _check_fields(graph, case.get("check_id"))
 
-        raw = observation_parser.parse(text, graph, expected_fields)
-        parsed = validate_parse(raw, graph)
+        try:
+            parsed = validate_parse(
+                observation_parser.parse(text, graph, expected_fields), graph
+            )
+        except ParseError as error:
+            field_total += len(expected) + len(absent)
+            failures.append(f"{case_id}: parser error: {error}")
+            continue
 
         case_ok = True
         for field_name, expected_value in expected.items():

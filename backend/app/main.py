@@ -10,18 +10,15 @@ from app.repository import SQLiteSessionRepository, default_db_path
 from app.routers import faults, sessions
 
 repository = SQLiteSessionRepository(default_db_path())
-# Built at import / lifespan so ROOTA_PARSER=anthropic without a key fails at
-# startup, not on the first observation request.
-parser = create_parser_from_env()
 
 
 @asynccontextmanager
-async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
     load_graphs(DEFAULT_GRAPHS_DIR)
-    # Re-resolve in case env changed between import and startup in tests.
-    global parser
-    parser = create_parser_from_env()
-    app.dependency_overrides[sessions.get_parser] = lambda: parser
+    # Built at startup so ROOTA_PARSER=anthropic without a key stops the server
+    # before it accepts requests. Stored on app.state (not in
+    # dependency_overrides) so startup never replaces a test's override.
+    app_.state.parser = create_parser_from_env()
     yield
 
 
@@ -38,7 +35,6 @@ app.add_middleware(
 app.include_router(sessions.router)
 app.include_router(faults.router)
 app.dependency_overrides[sessions.get_repository] = lambda: repository
-app.dependency_overrides[sessions.get_parser] = lambda: parser
 
 
 @app.get("/health")

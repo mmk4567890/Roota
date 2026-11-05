@@ -22,9 +22,15 @@ def repository(tmp_path: Path) -> Iterator[SQLiteSessionRepository]:
 
 
 @pytest.fixture
-def client(repository: SQLiteSessionRepository) -> Iterator[TestClient]:
-    # Tests must never call the real Anthropic API; default to KeywordParser.
+def client(
+    repository: SQLiteSessionRepository, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[TestClient]:
+    # Tests must never call the real Anthropic API, whatever the developer's
+    # shell has in ROOTA_PARSER / ANTHROPIC_API_KEY.
+    monkeypatch.setenv("ROOTA_PARSER", "keyword")
     app.dependency_overrides[sessions.get_parser] = lambda: KeywordParser()
-    with TestClient(app) as test_client:
-        yield test_client
-    app.dependency_overrides[sessions.get_parser] = lambda: main_module.parser
+    try:
+        with TestClient(app) as test_client:
+            yield test_client
+    finally:
+        app.dependency_overrides.pop(sessions.get_parser, None)

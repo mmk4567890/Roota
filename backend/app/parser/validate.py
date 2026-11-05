@@ -52,8 +52,11 @@ def validate_parse(result: Any, graph: FaultGraph) -> ParseResult:
     unclear: list[str] = []
     unclear_seen: set[str] = set()
 
-    for field_name in raw_unclear:
-        name = str(field_name)
+    for name in raw_unclear:
+        if not isinstance(name, str):
+            raise ParseError(
+                f"unclear_fields entries must be strings, got {type(name).__name__}"
+            )
         if name not in field_by_name:
             rejected.append(
                 RejectedValue(
@@ -67,8 +70,11 @@ def validate_parse(result: Any, graph: FaultGraph) -> ParseResult:
             unclear.append(name)
             unclear_seen.add(name)
 
-    for field_name, value in raw_extracted.items():
-        name = str(field_name)
+    for name, value in raw_extracted.items():
+        if not isinstance(name, str):
+            raise ParseError(
+                f"extracted keys must be strings, got {type(name).__name__}"
+            )
         if name not in field_by_name:
             rejected.append(
                 RejectedValue(
