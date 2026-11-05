@@ -403,6 +403,18 @@ def test_promoted_and_ruled_out_not_current(overtemperature: FaultGraph) -> None
     assert state.next_action.cause_id == "cooling_fan_failure"
 
 
+def test_cause_status_exposes_promoted_flag(overtemperature: FaultGraph) -> None:
+    # load_percent >= 90 promotes excessive_load while it remains open.
+    state = evaluate(overtemperature, {"load_percent": 95})
+    by_id = {item.cause_id: item for item in state.causes}
+    assert by_id["excessive_load"].status == "open"
+    assert by_id["excessive_load"].promoted is True
+    assert by_id["cooling_fan_failure"].promoted is False
+    # Open causes are listed in investigation order: promoted first.
+    open_ids = [item.cause_id for item in state.causes if item.status == "open"]
+    assert open_ids[0] == "excessive_load"
+
+
 def test_two_promoted_causes_ordered_by_priority() -> None:
     graph = FaultGraph.model_validate(
         {

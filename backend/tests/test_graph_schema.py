@@ -174,6 +174,14 @@ def test_get_faults_returns_overtemperature(client: TestClient) -> None:
     assert match["display_name"] == "Drive / heatsink overtemperature"
     assert "OH" in match["fault_codes"]
     assert match["description"]
+    assert isinstance(match["fields"], list)
+    assert match["fields"]
+    field_names = {field["name"] for field in match["fields"]}
+    assert "fan_status" in field_names
+    fan = next(field for field in match["fields"] if field["name"] == "fan_status")
+    assert fan["type"] == "enum"
+    assert "normal" in fan["values"]
+
 
 
 # --- Review additions: strict keys, type-aware conditions, reachability ---

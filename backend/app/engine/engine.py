@@ -34,6 +34,9 @@ class CauseStatus(BaseModel):
     name: str
     status: Literal["confirmed", "ruled_out", "contradiction", "open"]
     because: list[str]
+    # True when promote_when holds; the engine also lifts these earlier in
+    # investigation order. Exposed so the UI can mark them without re-evaluating.
+    promoted: bool = False
 
 
 class Evidence(BaseModel):
@@ -83,12 +86,22 @@ def evaluate(graph: FaultGraph, facts: dict[str, Any]) -> DiagnosticState:
     field_by_name = {field.name: field for field in graph.fields}
     check_by_id = {check.id: check for check in graph.checks}
 
-    cause_statuses: list[CauseStatus] = []
     status_by_id: dict[str, CauseStatus] = {}
     for cause in sorted(graph.causes, key=lambda item: item.priority):
-        status = _cause_status(cause, facts_snapshot)
-        cause_statuses.append(status)
-        status_by_id[cause.id] = status
+        status_by_id[cause.id] = _cause_status(cause, facts_snapshot)
+
+    # Non-open causes keep priority order; open causes use investigation order
+    # (promoted first) so the UI can render groups without reordering.
+    non_open = [
+        status_by_id[cause.id]
+        for cause in sorted(graph.causes, key=lambda item: item.priority)
+        if status_by_id[cause.id].status != "open"
+    ]
+    open_ordered = [
+        status_by_id[cause.id]
+        for cause in _ordered_open_causes(graph, facts_snapshot, status_by_id)
+    ]
+    cause_statuses = non_open + open_ordered
 
     checks_completed = [
         check.id
@@ -194,12 +207,15 @@ def _cause_status(cause: Cause, facts: dict[str, Any]) -> CauseStatus:
         elif name == "ruled_out_when":
             ruled_out, ruled_out_because = truth, because
 
+    promoted = _is_promoted(cause, facts)
+
     if confirmed is Truth.TRUE and ruled_out is Truth.TRUE:
         return CauseStatus(
             cause_id=cause.id,
             name=cause.name,
             status="contradiction",
             because=_unique_sorted(confirmed_because + ruled_out_because),
+            promoted=promoted,
         )
     if confirmed is Truth.TRUE:
         return CauseStatus(
@@ -207,6 +223,7 @@ def _cause_status(cause: Cause, facts: dict[str, Any]) -> CauseStatus:
             name=cause.name,
             status="confirmed",
             because=confirmed_because,
+            promoted=promoted,
         )
     if ruled_out is Truth.TRUE:
         return CauseStatus(
@@ -214,12 +231,14 @@ def _cause_status(cause: Cause, facts: dict[str, Any]) -> CauseStatus:
             name=cause.name,
             status="ruled_out",
             because=ruled_out_because,
+            promoted=promoted,
         )
     return CauseStatus(
         cause_id=cause.id,
         name=cause.name,
         status="open",
         because=[],
+        promoted=promoted,
     )
 
 
