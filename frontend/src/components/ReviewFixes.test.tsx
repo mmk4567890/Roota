@@ -1,5 +1,5 @@
 /**
- * Regression tests for the Prompt 7 review fixes.
+ * Regression tests for session UI review fixes.
  */
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";

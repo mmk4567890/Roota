@@ -9,7 +9,7 @@ router = APIRouter(tags=["docs"])
 
 
 def get_manual_store(request: Request) -> ManualStore:
-    """The ManualStore main's lifespan built (AGENTS.md Quality bar 9)."""
+    """The ManualStore main's lifespan built."""
     store = getattr(request.app.state, "manual_store", None)
     if store is None:
         raise RuntimeError("Manual store was not configured")
