@@ -109,6 +109,5 @@ That command calls the real Anthropic API (requires `ANTHROPIC_API_KEY`) and may
 
 ## What's next
 
-- Session UI for technicians (Prompt 7)
-- Session summary, photo input and demo (Prompt 8)
+- Session summary, photo input and demo
 - Real fault graphs and citations from the chosen VFD manual (every `TODO(roota)` in `backend/app/graphs/data/`)
