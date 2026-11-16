@@ -1,4 +1,4 @@
-"""Regression tests for the Prompt 6b review fixes: request shape accepted by
+"""Regression tests for review fixes: request shape accepted by
 current models, OS trust store for outbound TLS, and a prefetch that works."""
 
 from __future__ import annotations

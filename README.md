@@ -8,7 +8,6 @@ Roota is a stateful fault-isolation assistant for industrial variable-frequency 
 roota/
   frontend/   # React + Vite + TypeScript + Tailwind
   backend/    # Python + FastAPI
-  AGENTS.md
   README.md
   .gitignore
 ```

@@ -1,4 +1,4 @@
-"""Regression tests for the Prompt 5 review fixes."""
+"""Regression tests for observation parsing review fixes."""
 
 from __future__ import annotations
 

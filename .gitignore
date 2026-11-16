@@ -60,3 +60,8 @@ backend/data/
 # Source manuals (often large PDFs); keep the directory via .gitkeep
 docs/manuals/**
 !docs/manuals/.gitkeep
+
+# Local AI tooling
+AGENTS.md
+.claude/
+docs/cursor-prompts.md

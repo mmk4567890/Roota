@@ -18,7 +18,7 @@ import ssl
 def system_ssl_context() -> ssl.SSLContext:
     context = ssl.create_default_context()
     # create_default_context already sets both; asserted so a future change
-    # here can never silently turn verification off (AGENTS.md: never disable TLS).
+    # here can never silently turn verification off (never disable TLS).
     if context.verify_mode != ssl.CERT_REQUIRED or not context.check_hostname:
         raise RuntimeError("system SSL context must verify certificates and hostnames")
     return context
