@@ -237,7 +237,7 @@ def test_everything_ruled_out_escalates(acs580: FaultGraph) -> None:
     assert action.type == "escalate"
 
 
-def test_unclear_answer_marks_inconclusive_and_continues(acs580: FaultGraph) -> None:
+def test_fan_unclear_marks_single_check_cause_inconclusive(acs580: FaultGraph) -> None:
     from app.engine.engine import UNCLEAR_REASON
 
     state = evaluate(acs580, {"fan_status": "unclear"})
@@ -262,6 +262,73 @@ def test_unclear_answer_marks_inconclusive_and_continues(acs580: FaultGraph) -> 
     assert "Cooling fan not operating" in exhausted.next_action.message
     assert UNCLEAR_REASON in exhausted.next_action.message
     assert "fan_status" not in exhausted.next_action.message
+
+
+def test_airflow_unclear_still_asks_heatsink_check(acs580: FaultGraph) -> None:
+    state = evaluate(
+        acs580,
+        {"fan_status": "normal", "airflow_obstruction": "unclear"},
+    )
+    by_id = {cause.cause_id: cause.status for cause in state.causes}
+    assert by_id["cooling_fan_failure"] == "ruled_out"
+    assert by_id["blocked_airflow"] == "open"
+    assert state.next_action.type == "check"
+    assert state.next_action.check is not None
+    assert state.next_action.check.id == "check_heatsink_cleanliness"
+    assert state.next_action.cause_id == "blocked_airflow"
+
+
+def test_airflow_unclear_and_dusty_heatsink_confirms_airflow_cause(
+    acs580: FaultGraph,
+) -> None:
+    state = evaluate(
+        acs580,
+        {
+            "fan_status": "normal",
+            "airflow_obstruction": "unclear",
+            "heatsink_condition": "dusty",
+        },
+    )
+    by_id = {cause.cause_id: cause.status for cause in state.causes}
+    assert by_id["blocked_airflow"] == "confirmed"
+    assert state.next_action.type == "root_cause"
+    assert state.next_action.cause_id == "blocked_airflow"
+
+
+def test_airflow_unclear_and_clean_heatsink_is_inconclusive(acs580: FaultGraph) -> None:
+    from app.engine.engine import UNCLEAR_REASON
+
+    state = evaluate(
+        acs580,
+        {
+            "fan_status": "normal",
+            "airflow_obstruction": "unclear",
+            "heatsink_condition": "clean",
+        },
+    )
+    blocked = next(c for c in state.causes if c.cause_id == "blocked_airflow")
+    assert blocked.status == "inconclusive"
+    assert blocked.because == ["airflow_obstruction", "heatsink_condition"]
+    assert state.next_action.type == "check"
+    assert state.next_action.check is not None
+    assert state.next_action.check.id == "check_ambient_temperature"
+
+    # Escalation after the rest are ruled out still names the unclear airflow.
+    exhausted = evaluate(
+        acs580,
+        {
+            "fan_status": "normal",
+            "airflow_obstruction": "unclear",
+            "heatsink_condition": "clean",
+            "ambient_above_derating_temp": "no",
+            "motor_power_vs_drive": "within",
+        },
+    )
+    assert exhausted.next_action.type == "escalate"
+    assert "Obstructed cooling air flow or dusty heatsink" in exhausted.next_action.message
+    assert UNCLEAR_REASON in exhausted.next_action.message
+    assert "Heatsink: Clean" in exhausted.next_action.message
+    assert "airflow_obstruction" not in exhausted.next_action.message
 
 
 def test_escalation_reason_never_contains_raw_field_ids(acs580: FaultGraph) -> None:
@@ -416,5 +483,7 @@ def test_api_ambient_between_derating_limits_is_unclear_with_message(
         for c in body["state"]["causes"]
         if c["cause_id"] == "load_above_derated_capacity"
     )
-    assert load["status"] == "inconclusive"
+    # Ambient unclear leaves the derated-load check available.
+    assert load["status"] == "open"
     assert body["state"]["next_action"]["type"] == "check"
+    assert body["state"]["next_action"]["check"]["id"] == "check_derated_load"

@@ -251,23 +251,10 @@ def _cause_status(
         for check_id in cause.checks
         for field_name in check_by_id[check_id].collects
     ]
-    # "Not sure" blocks confirming or ruling out — mark inconclusive now and
-    # skip any remaining checks for this cause (same outcome family as noisy).
-    unclear_collectable = [
-        field_name
-        for field_name in collectable
-        if facts.get(field_name) == UNCLEAR
-    ]
-    if unclear_collectable:
-        return CauseStatus(
-            cause_id=cause.id,
-            name=cause.name,
-            status="inconclusive",
-            because=_unique_sorted(unclear_collectable),
-            promoted=promoted,
-        )
-    # Checks are complete but neither confirm nor rule out → inconclusive, so
-    # investigation can continue with the remaining open causes.
+    # Unclear answers count as answered but do not confirm or rule out. Keep the
+    # cause open while other collectable fields are still missing so later
+    # checks can still confirm or rule it out. Only when every collectable
+    # field is answered and neither condition holds → inconclusive.
     if collectable and all(
         _is_answered(facts, field_name) for field_name in collectable
     ):

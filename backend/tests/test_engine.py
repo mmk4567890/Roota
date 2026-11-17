@@ -362,6 +362,7 @@ def test_threshold_carrier_exactly_8(overtemperature: FaultGraph) -> None:
 def test_unclear_on_number_field_marks_inconclusive_and_continues(
     overtemperature: FaultGraph,
 ) -> None:
+    # high_ambient_temperature has a single check — unclear finishes it.
     state = evaluate(
         overtemperature,
         {
@@ -377,6 +378,44 @@ def test_unclear_on_number_field_marks_inconclusive_and_continues(
     assert state.next_action.type == "check"
     assert state.next_action.check is not None
     assert state.next_action.check.id == "check_carrier_frequency"
+
+
+def test_airflow_unclear_keeps_heatsink_check_open(
+    overtemperature: FaultGraph,
+) -> None:
+    state = evaluate(
+        overtemperature,
+        {"fan_status": "normal", "airflow_obstruction": UNCLEAR},
+    )
+    assert _status_map(state)["blocked_airflow"] == "open"
+    assert state.next_action.type == "check"
+    assert state.next_action.check is not None
+    assert state.next_action.check.id == "check_heatsink_cleanliness"
+
+    confirmed = evaluate(
+        overtemperature,
+        {
+            "fan_status": "normal",
+            "airflow_obstruction": UNCLEAR,
+            "heatsink_condition": "dusty",
+        },
+    )
+    assert _status_map(confirmed)["blocked_airflow"] == "confirmed"
+    assert confirmed.next_action.type == "root_cause"
+    assert confirmed.next_action.cause_id == "blocked_airflow"
+
+    inconclusive = evaluate(
+        overtemperature,
+        {
+            "fan_status": "normal",
+            "airflow_obstruction": UNCLEAR,
+            "heatsink_condition": "clean",
+        },
+    )
+    assert _status_map(inconclusive)["blocked_airflow"] == "inconclusive"
+    assert inconclusive.next_action.type == "check"
+    assert inconclusive.next_action.check is not None
+    assert inconclusive.next_action.check.id == "check_load_level"
 
 
 def test_unknown_fact_field_raises(overtemperature: FaultGraph) -> None:
