@@ -6,7 +6,7 @@ import {
   makeSession,
   sampleFault,
 } from "../test/fixtures";
-import { SessionScreen } from "./SessionScreen";
+import { SessionScreen, UNCLEAR_MOVED_ON_MESSAGE } from "./SessionScreen";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -79,9 +79,103 @@ describe("SessionScreen", () => {
     );
   });
 
+  it("marks Not sure and shows the move-on message", async () => {
+    const updated = makeSession({
+      state: {
+        ...makeSession().state,
+        facts: { fan_status: "unclear" },
+        checks_completed: ["check_fan_operation"],
+        causes: makeSession().state.causes.map((cause) =>
+          cause.cause_id === "cooling_fan_failure"
+            ? { ...cause, status: "inconclusive" as const, because: ["fan_status"] }
+            : cause,
+        ),
+        next_action: {
+          ...makeSession().state.next_action,
+          type: "check",
+          message: "Check the airflow path.",
+          check: {
+            id: "check_airflow_path",
+            instruction: "Inspect the vents.",
+            reason: "Blocked airflow is next.",
+            collects: ["airflow_obstruction"],
+            source: {
+              doc_id: "TBD_MANUAL",
+              section: "Airflow",
+              page: 13,
+              printed_page: 13,
+            },
+          },
+        },
+      },
+    });
+    vi.spyOn(api, "reportFacts").mockResolvedValue(updated);
+    const props = renderSession();
+
+    fireEvent.click(screen.getByRole("button", { name: "Not sure" }));
+
+    await waitFor(() =>
+      expect(api.reportFacts).toHaveBeenCalledWith(props.session.id, {
+        facts: { fan_status: "unclear" },
+        check_id: "check_fan_operation",
+      }),
+    );
+    expect(props.onSessionChange).toHaveBeenCalledWith(updated);
+    expect(screen.getByText(UNCLEAR_MOVED_ON_MESSAGE)).toBeInTheDocument();
+    expect(screen.getByText(/Fan status: Not sure/)).toBeInTheDocument();
+  });
+
   it("opens the session log drawer", () => {
-    renderSession();
+    const sessionId = makeSession().id;
+    renderSession({
+      session: makeSession({
+        events: [
+          {
+            id: 1,
+            session_id: sessionId,
+            seq: 1,
+            type: "facts_reported",
+            created_at: "2026-01-01T12:01:00Z",
+            payload: {
+              facts: { fan_status: "normal" },
+              check_id: "check_fan_operation",
+            },
+          },
+        ],
+      }),
+    });
     fireEvent.click(screen.getByRole("button", { name: "Session log" }));
     expect(screen.getByRole("dialog", { name: /session log/i })).toBeInTheDocument();
+    expect(screen.getByText("Fan status: Normal")).toBeInTheDocument();
+  });
+
+  it("undoes a log event from the drawer", async () => {
+    const sessionId = makeSession().id;
+    const session = makeSession({
+      events: [
+        {
+          id: 7,
+          session_id: sessionId,
+          seq: 1,
+          type: "facts_reported",
+          created_at: "2026-01-01T12:01:00Z",
+          payload: {
+            facts: { fan_status: "noisy" },
+            check_id: "check_fan_operation",
+          },
+        },
+      ],
+    });
+    const undone = makeSession({ events: session.events });
+    vi.spyOn(api, "undoEvent").mockResolvedValue(undone);
+    const props = renderSession({ session });
+
+    fireEvent.click(screen.getByRole("button", { name: "Session log" }));
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+
+    await waitFor(() =>
+      expect(api.undoEvent).toHaveBeenCalledWith(session.id, { event_id: 7 }),
+    );
+    expect(props.onSessionChange).toHaveBeenCalledWith(undone);
   });
 });

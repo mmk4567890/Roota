@@ -49,6 +49,9 @@ describe("CurrentCheck", () => {
       screen.getByText(/ABB ACS580 firmware manual · 4290 Cooling · \[ P\. 557 \]/),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Normal" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Not sure" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Noisy" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Not running" })).toBeInTheDocument();
     expect(screen.queryByText("fan_status")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "View passage" }));
@@ -59,4 +62,27 @@ describe("CurrentCheck", () => {
       screen.getByText("Check air flow and fan operation."),
     ).toBeInTheDocument();
   });
+
+  it("submits the Not sure chip", async () => {
+    const onChip = vi.fn(async () => true);
+    render(
+      <CurrentCheck
+        check={check}
+        checkIndex={1}
+        checkTotal={5}
+        fields={sampleFault.fields}
+        evidence={null}
+        disabled={false}
+        submitting={false}
+        lastParse={null}
+        lastMessage={null}
+        onChip={onChip}
+        onObserve={vi.fn(async () => true)}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Not sure" }));
+    expect(onChip).toHaveBeenCalledWith("fan_status", "unclear");
+  });
 });
+
