@@ -81,12 +81,12 @@ Start a session for **ABB ACS580 drive overtemperature**, then type observations
 3. `Fan is fine, vents clear, heatsink clean.` then `Room is cool.` then `Motor matches the drive.` → all causes ruled out → escalate.
 4. Escalation path with inconclusive fan: `The cooling fan is noisy.` then clear the rest (`vents clear`, `heatsink clean`, `room is cool`, `motor matches the drive`) → escalate, naming the noisy fan as inconclusive.
 
-Use **Enter values directly** if you want to set fields without natural language.
+Use the **quick-answer buttons** under each check (including **Not sure**) or the free-text box to report what you see.
 
 ## Testing
 
 ```bash
-# Backend — expect 254 passed, 3 skipped (live tests opt-in with --live)
+# Backend — expect 263 passed, 3 skipped (live tests opt-in with --live)
 cd backend
 python -X dev -m pytest -W error::DeprecationWarning -W error::ResourceWarning
 
