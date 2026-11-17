@@ -14,8 +14,6 @@ Technicians diagnose drive faults from long PDF manuals. Roota walks them throug
 
 ![Session summary](docs/summary.png)
 
-> Replace these placeholders with real captures of a live session and a completed summary.
-
 ## Architecture
 
 ```mermaid
@@ -88,14 +86,14 @@ Use **Enter values directly** if you want to set fields without natural language
 ## Testing
 
 ```bash
-# Backend — expect 249 passed, 3 skipped (live tests opt-in with --live)
+# Backend — expect 254 passed, 3 skipped (live tests opt-in with --live)
 cd backend
 python -X dev -m pytest -W error::DeprecationWarning -W error::ResourceWarning
 
-# Keyword parser eval against the shipped ACS580 graph — 70/70 cases, 83/83 fields
+# Keyword parser eval against the shipped ACS580 graph — 75/75 cases, 88/88 fields
 python scripts/eval_parser.py --parser keyword
 
-# Frontend — expect 28 passed; also type-check + production build
+# Frontend — expect 29 passed; also type-check + production build
 cd frontend
 npm test
 npm run build
