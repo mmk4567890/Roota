@@ -134,7 +134,7 @@
         "field": "fan_status",
         "op": "eq",
         "value": "not_running",
-        "_todo": "TODO(roota): the manual does not say whether a running but noisy fan counts as faulty, so 'noisy' neither confirms nor rules out this cause and the session escalates. Confirm with ABB service guidance."
+        "_todo": "TODO(roota): the manual does not say whether a running but noisy fan counts as faulty, so 'noisy' leaves this cause inconclusive and investigation continues. Confirm with ABB service guidance."
       },
       "promote_when": null,
       "corrective_action": "Check fan operation and connection, and replace the fan if faulty. On frame R6 and larger, read the auxiliary code of warning A581 / fault 5080 to identify the fan (0 = main fan 1; otherwise the last digit is the fan index).",

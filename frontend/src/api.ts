@@ -71,7 +71,8 @@ export type CauseStatusKind =
   | "confirmed"
   | "ruled_out"
   | "contradiction"
-  | "open";
+  | "open"
+  | "inconclusive";
 
 export interface CauseStatus {
   cause_id: string;

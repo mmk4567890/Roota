@@ -596,12 +596,11 @@ def test_graph_gap_escalates() -> None:
 
     state = evaluate(graph, {"observed": "done"})
 
-    assert _status_map(state)["unresolvable"] == "open"
+    assert _status_map(state)["unresolvable"] == "inconclusive"
     assert state.next_action.type == "escalate"
     assert state.next_action.cause_id == "unresolvable"
-    assert state.next_action.message == (
-        "The documented checks for Unresolvable are complete but do not resolve it."
-    )
+    assert "Inconclusive: Unresolvable" in state.next_action.message
+    assert "observed='done'" in state.next_action.message
 
 
 # --- Review additions ---

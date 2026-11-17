@@ -145,11 +145,39 @@ def test_fan_not_running_is_the_root_cause(acs580: FaultGraph) -> None:
     assert action.source is not None and action.source.page == 541
 
 
-def test_noisy_fan_escalates_instead_of_guessing(acs580: FaultGraph) -> None:
-    # The manual does not say whether a noisy fan is faulty.
-    action = evaluate(acs580, {"fan_status": "noisy"}).next_action
-    assert action.type == "escalate"
-    assert action.cause_id == "cooling_fan_failure"
+def test_noisy_fan_continues_to_airflow(acs580: FaultGraph) -> None:
+    # The manual does not say whether a noisy fan is faulty — leave that cause
+    # inconclusive and keep investigating airflow.
+    state = evaluate(acs580, {"fan_status": "noisy"})
+    by_id = {cause.cause_id: cause.status for cause in state.causes}
+    assert by_id["cooling_fan_failure"] == "inconclusive"
+    assert state.next_action.type == "check"
+    assert state.next_action.check is not None
+    assert state.next_action.check.id == "check_airflow_path"
+
+
+def test_noisy_fan_escalates_when_everything_else_is_ruled_out(
+    acs580: FaultGraph,
+) -> None:
+    state = evaluate(
+        acs580,
+        {
+            "fan_status": "noisy",
+            "airflow_obstruction": "none",
+            "heatsink_condition": "clean",
+            "ambient_above_derating_temp": "no",
+            "motor_power_vs_drive": "within",
+        },
+    )
+    by_id = {cause.cause_id: cause.status for cause in state.causes}
+    assert by_id["cooling_fan_failure"] == "inconclusive"
+    assert by_id["blocked_airflow"] == "ruled_out"
+    assert by_id["load_above_derated_capacity"] == "ruled_out"
+    assert by_id["motor_exceeds_drive_power"] == "ruled_out"
+    assert state.next_action.type == "escalate"
+    assert state.next_action.cause_id == "cooling_fan_failure"
+    assert "Cooling fan not operating" in state.next_action.message
+    assert "fan_status='noisy'" in state.next_action.message
 
 
 def test_dusty_heatsink_confirms_airflow_cause(acs580: FaultGraph) -> None:

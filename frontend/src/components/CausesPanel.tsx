@@ -10,6 +10,7 @@ export function CausesPanel({ causes }: CausesPanelProps) {
   const stillRelevant = causes.filter(
     (item) => item.status === "open" || item.status === "contradiction",
   );
+  const inconclusive = causes.filter((item) => item.status === "inconclusive");
   const ruledOut = causes.filter((item) => item.status === "ruled_out");
 
   return (
@@ -29,6 +30,14 @@ export function CausesPanel({ causes }: CausesPanelProps) {
         markPromoted
       />
       <CauseGroup
+        title="Inconclusive"
+        items={inconclusive}
+        empty="None inconclusive."
+        showBecause
+        becauseLabel="Left unresolved by"
+        itemClassName="border-amber-200 bg-amber-50"
+      />
+      <CauseGroup
         title="Ruled out"
         items={ruledOut}
         empty="None ruled out yet."
@@ -44,6 +53,8 @@ interface CauseGroupProps {
   empty: string;
   markPromoted?: boolean;
   showBecause?: boolean;
+  becauseLabel?: string;
+  itemClassName?: string;
 }
 
 function CauseGroup({
@@ -52,6 +63,8 @@ function CauseGroup({
   empty,
   markPromoted = false,
   showBecause = false,
+  becauseLabel = "Ruled out by",
+  itemClassName = "border-ink-100 bg-ink-50",
 }: CauseGroupProps) {
   return (
     <div className="mt-4">
@@ -65,7 +78,7 @@ function CauseGroup({
           {items.map((item) => (
             <li
               key={item.cause_id}
-              className="rounded border border-ink-100 bg-ink-50 px-3 py-2 text-sm"
+              className={`rounded border px-3 py-2 text-sm ${itemClassName}`}
             >
               <div className="flex flex-wrap items-baseline gap-2">
                 <span className="font-medium text-ink-900">{item.name}</span>
@@ -79,6 +92,11 @@ function CauseGroup({
                     Contradiction
                   </span>
                 ) : null}
+                {item.status === "inconclusive" ? (
+                  <span className="rounded bg-amber-200 px-1.5 py-0.5 text-xs font-medium text-amber-900">
+                    Inconclusive
+                  </span>
+                ) : null}
               </div>
               {item.status === "contradiction" && item.because.length > 0 ? (
                 <p className="mt-1 text-xs text-red-800">
@@ -87,7 +105,7 @@ function CauseGroup({
               ) : null}
               {showBecause && item.because.length > 0 ? (
                 <p className="mt-1 text-xs text-ink-500">
-                  Ruled out by: {item.because.join(", ")}
+                  {becauseLabel}: {item.because.join(", ")}
                 </p>
               ) : null}
             </li>

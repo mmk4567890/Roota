@@ -4,7 +4,7 @@ import { makeCause } from "../test/fixtures";
 import { CausesPanel } from "./CausesPanel";
 
 describe("CausesPanel", () => {
-  it("groups causes into confirmed, still relevant, and ruled out", () => {
+  it("groups causes into confirmed, still relevant, inconclusive, and ruled out", () => {
     render(
       <CausesPanel
         causes={[
@@ -18,6 +18,12 @@ describe("CausesPanel", () => {
             cause_id: "cooling_fan_failure",
             name: "Cooling fan failure",
             status: "confirmed",
+          }),
+          makeCause({
+            cause_id: "noisy_fan",
+            name: "Noisy cooling fan",
+            status: "inconclusive",
+            because: ["fan_status"],
           }),
           makeCause({
             cause_id: "excessive_load",
@@ -41,6 +47,9 @@ describe("CausesPanel", () => {
       screen.getByRole("heading", { name: "Still relevant" }),
     ).toBeInTheDocument();
     expect(
+      screen.getByRole("heading", { name: "Inconclusive" }),
+    ).toBeInTheDocument();
+    expect(
       screen.getByRole("heading", { name: "Ruled out" }),
     ).toBeInTheDocument();
 
@@ -48,7 +57,12 @@ describe("CausesPanel", () => {
     expect(screen.getByText("Excessive load")).toBeInTheDocument();
     expect(screen.getByText("High ambient temperature")).toBeInTheDocument();
     expect(screen.getByText("Blocked airflow")).toBeInTheDocument();
+    expect(screen.getByText("Noisy cooling fan")).toBeInTheDocument();
     expect(screen.getByText("Promoted")).toBeInTheDocument();
+    expect(screen.getAllByText("Inconclusive").length).toBeGreaterThanOrEqual(1);
+    expect(
+      screen.getByText(/Left unresolved by: fan_status/),
+    ).toBeInTheDocument();
     expect(
       screen.getByText(/Ruled out by: airflow_obstruction/),
     ).toBeInTheDocument();

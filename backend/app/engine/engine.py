@@ -32,7 +32,9 @@ class CauseStatus(BaseModel):
 
     cause_id: str
     name: str
-    status: Literal["confirmed", "ruled_out", "contradiction", "open"]
+    status: Literal[
+        "confirmed", "ruled_out", "contradiction", "open", "inconclusive"
+    ]
     because: list[str]
     # True when promote_when holds; the engine also lifts these earlier in
     # investigation order. Exposed so the UI can mark them without re-evaluating.
@@ -88,7 +90,7 @@ def evaluate(graph: FaultGraph, facts: dict[str, Any]) -> DiagnosticState:
 
     status_by_id: dict[str, CauseStatus] = {}
     for cause in sorted(graph.causes, key=lambda item: item.priority):
-        status_by_id[cause.id] = _cause_status(cause, facts_snapshot)
+        status_by_id[cause.id] = _cause_status(cause, facts_snapshot, check_by_id)
 
     # Non-open causes keep priority order; open causes use investigation order
     # (promoted first) so the UI can render groups without reordering.
@@ -194,7 +196,11 @@ def _evaluate_leaf(
     return Truth.FALSE, []
 
 
-def _cause_status(cause: Cause, facts: dict[str, Any]) -> CauseStatus:
+def _cause_status(
+    cause: Cause,
+    facts: dict[str, Any],
+    check_by_id: dict[str, Check],
+) -> CauseStatus:
     confirmed = Truth.UNKNOWN
     confirmed_because: list[str] = []
     ruled_out = Truth.UNKNOWN
@@ -233,6 +239,23 @@ def _cause_status(cause: Cause, facts: dict[str, Any]) -> CauseStatus:
             because=ruled_out_because,
             promoted=promoted,
         )
+
+    collectable = [
+        field_name
+        for check_id in cause.checks
+        for field_name in check_by_id[check_id].collects
+    ]
+    # Checks are complete but neither confirm nor rule out → inconclusive, so
+    # investigation can continue with the remaining open causes.
+    if collectable and all(_is_known(facts, field_name) for field_name in collectable):
+        return CauseStatus(
+            cause_id=cause.id,
+            name=cause.name,
+            status="inconclusive",
+            because=_unique_sorted(collectable),
+            promoted=promoted,
+        )
+
     return CauseStatus(
         cause_id=cause.id,
         name=cause.name,
@@ -279,10 +302,7 @@ def _decide_next_action(
 
     open_causes = _ordered_open_causes(graph, facts, status_by_id)
     if not open_causes:
-        return NextAction(
-            type="escalate",
-            message="All documented causes for this fault have been ruled out.",
-        )
+        return _escalate_exhausted(cause_statuses, facts)
 
     current = open_causes[0]
     for check_id in current.checks:
@@ -318,11 +338,49 @@ def _decide_next_action(
             source=check.source,
         )
 
+    # An open cause should have been marked inconclusive once its checks are
+    # complete; reaching here means the graph left a gap — escalate that cause.
     return NextAction(
         type="escalate",
         cause_id=current.id,
         message=(
             f"The documented checks for {current.name} are complete but do not resolve it."
+        ),
+    )
+
+
+def _escalate_exhausted(
+    cause_statuses: list[CauseStatus],
+    facts: dict[str, Any],
+) -> NextAction:
+    """Escalate when nothing remains open and nothing is confirmed."""
+    inconclusive = [item for item in cause_statuses if item.status == "inconclusive"]
+    if not inconclusive:
+        return NextAction(
+            type="escalate",
+            message="All documented causes for this fault have been ruled out.",
+        )
+
+    parts: list[str] = []
+    for item in inconclusive:
+        fact_bits = [
+            f"{field}={facts[field]!r}"
+            for field in item.because
+            if field in facts
+        ]
+        why = ", ".join(fact_bits) if fact_bits else ", ".join(item.because)
+        if why:
+            parts.append(f"{item.name} ({why})")
+        else:
+            parts.append(item.name)
+
+    cause_id = inconclusive[0].cause_id if len(inconclusive) == 1 else None
+    return NextAction(
+        type="escalate",
+        cause_id=cause_id,
+        message=(
+            "All documented causes are ruled out or inconclusive; none confirmed. "
+            f"Inconclusive: {'; '.join(parts)}."
         ),
     )
 
