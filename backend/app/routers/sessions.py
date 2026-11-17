@@ -4,7 +4,8 @@ import logging
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import PlainTextResponse
 
 from app.engine.engine import DiagnosticState, evaluate, validate_facts
 from app.engine.replay import is_event_undone, replay_facts, session_is_closed
@@ -19,6 +20,7 @@ from app.models import (
     SessionView,
     UndoRequest,
 )
+from app.summary import SessionSummary, build_summary, render_markdown
 from app.parser.base import ObservationParser, ParseError, ParseResult
 from app.parser.validate import validate_parse
 from app.repository import (
@@ -230,6 +232,58 @@ def close_session(
 
     _append_or_409(repository, session_id, "closed", {})
     return _session_view(record, repository, graph, store)
+
+
+@router.get(
+    "/sessions/{session_id}/summary",
+    response_model=None,
+    responses={
+        200: {
+            "content": {
+                "application/json": {"schema": SessionSummary.model_json_schema()},
+                "text/markdown": {"schema": {"type": "string"}},
+            }
+        }
+    },
+)
+def get_session_summary(
+    session_id: UUID,
+    format: str | None = Query(default=None, pattern="^(json|markdown)$"),
+    repository: SessionRepository = Depends(get_repository),
+    graphs: dict[str, FaultGraph] = Depends(get_graphs),
+    store: ManualStore = Depends(get_manual_store),
+) -> SessionSummary | PlainTextResponse:
+    """Structured session record built only from the event log and engine."""
+    del store  # Summary does not attach evidence passages.
+    record = _require_session(session_id, repository)
+    graph = _graph_for_session(record, graphs)
+    events = repository.list_events(session_id)
+    facts = replay_facts(events)
+    try:
+        state = evaluate(graph, facts)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Stored session facts are incompatible with the current fault graph: "
+                f"{error}"
+            ),
+        ) from error
+
+    summary = build_summary(
+        session_id=record.id,
+        equipment_label=record.equipment_label,
+        started_at=record.created_at,
+        graph=graph,
+        events=events,
+        state=state,
+    )
+    if format == "markdown":
+        return PlainTextResponse(
+            render_markdown(summary),
+            media_type="text/markdown; charset=utf-8",
+        )
+    return summary
 
 
 def _session_view(

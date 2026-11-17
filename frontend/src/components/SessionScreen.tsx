@@ -17,6 +17,7 @@ import { FactsForm } from "./FactsForm";
 import { FactsTable } from "./FactsTable";
 import { NextActionCard } from "./NextActionCard";
 import { ObservationForm } from "./ObservationForm";
+import { SummaryPanel } from "./SummaryPanel";
 import { Timeline } from "./Timeline";
 
 interface SessionScreenProps {
@@ -227,6 +228,7 @@ export function SessionScreen({
         <div className="space-y-4">
           <CausesPanel causes={session.state.causes} />
           <FactsTable facts={session.state.facts} />
+          <SummaryPanel sessionId={session.id} />
           <Timeline
             events={session.events}
             disabled={closed || anyBusy}

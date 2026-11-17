@@ -106,7 +106,20 @@ python -X dev -m pytest --live tests/live
 
 That command calls the real Anthropic API (requires `ANTHROPIC_API_KEY`) and may download Chroma's embedding model on first run.
 
+## Session summary
+
+```bash
+# JSON
+curl -s http://localhost:8000/sessions/<id>/summary
+
+# Markdown report
+curl -s "http://localhost:8000/sessions/<id>/summary?format=markdown"
+```
+
+The technician UI has a Summary panel with copy and download.
+
 ## What's next
 
-- Session summary, photo input and demo
-- Real fault graphs and citations from the chosen VFD manual (every `TODO(roota)` in `backend/app/graphs/data/`)
+- Photo observations (multipart image on `/observations`)
+- End-to-end demo script against the keyword parser
+- Clear remaining `TODO(roota)` notes in `backend/app/graphs/data/`

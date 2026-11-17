@@ -151,6 +151,45 @@ export interface UndoRequest {
   event_id: number;
 }
 
+export interface FactReport {
+  field: string;
+  value: unknown;
+  reported_at: string;
+  event_id: number;
+  how: "form" | "observation";
+  text: string | null;
+  undone: boolean;
+}
+
+export interface RootCauseSummary {
+  cause_id: string;
+  name: string;
+  corrective_action: string;
+  source: Source;
+}
+
+export interface CitationUsed {
+  doc_id: string;
+  section: string;
+  page: number | null;
+  used_for: string;
+}
+
+export interface SessionSummary {
+  session_id: string;
+  fault_id: string;
+  display_name: string;
+  equipment_label: string;
+  status: SessionStatus;
+  started_at: string;
+  closed_at: string | null;
+  causes: CauseStatus[];
+  root_cause: RootCauseSummary | null;
+  escalation_reason: string | null;
+  facts: FactReport[];
+  citations: CitationUsed[];
+}
+
 /** Error raised for any non-OK API response; message is the backend detail. */
 export class ApiError extends Error {
   readonly status: number;
@@ -279,6 +318,35 @@ export function closeSession(sessionId: string): Promise<SessionView> {
   return request<SessionView>(`/sessions/${sessionId}/close`, {
     method: "POST",
   });
+}
+
+export function getSessionSummary(sessionId: string): Promise<SessionSummary> {
+  return request<SessionSummary>(`/sessions/${sessionId}/summary`);
+}
+
+export async function getSessionSummaryMarkdown(
+  sessionId: string,
+): Promise<string> {
+  const response = await fetch(
+    `${API_BASE}/sessions/${sessionId}/summary?format=markdown`,
+    { headers: { Accept: "text/markdown" } },
+  );
+  const text = await response.text();
+  if (!response.ok) {
+    let detail: unknown = text;
+    try {
+      const parsed = JSON.parse(text) as { detail?: unknown };
+      detail = parsed.detail ?? parsed;
+    } catch {
+      /* keep raw text */
+    }
+    throw new ApiError(
+      response.status,
+      detail,
+      formatApiDetail(detail) || `Request failed (${response.status})`,
+    );
+  }
+  return text;
 }
 
 /** True when an undo event in the log targets this event id. */
