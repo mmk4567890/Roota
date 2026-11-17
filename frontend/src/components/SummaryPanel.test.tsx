@@ -107,7 +107,7 @@ afterEach(() => {
 });
 
 describe("SummaryPanel", () => {
-  it("shows a green root-cause banner, causes, facts, citations, and print control", async () => {
+  it("shows a green root-cause banner with causes, facts, citations, and action", async () => {
     getSummaryMock.mockResolvedValue(summaryFixture);
     getMarkdownMock.mockResolvedValue("# markdown");
 
@@ -120,6 +120,7 @@ describe("SummaryPanel", () => {
     expect(
       screen.getAllByText("Cooling fan not operating").length,
     ).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Replace the fan if faulty.")).toBeInTheDocument();
     expect(screen.getByText("Facts timeline")).toBeInTheDocument();
     expect(
       screen.getByText(/The cooling fan is not running/),
@@ -128,12 +129,10 @@ describe("SummaryPanel", () => {
     expect(
       screen.getByText(/Check fan operation and connection/),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Print / Save as PDF" }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Corrective action")).toBeInTheDocument();
   });
 
-  it("shows an amber escalate banner naming inconclusive causes", async () => {
+  it("shows an amber escalate banner listing inconclusive causes", async () => {
     getSummaryMock.mockResolvedValue(escalateFixture);
     getMarkdownMock.mockResolvedValue("# markdown");
 
@@ -144,8 +143,52 @@ describe("SummaryPanel", () => {
       expect(screen.getByText("Escalate")).toBeInTheDocument();
     });
     expect(
+      screen.getByText(/All documented causes are ruled out or inconclusive/),
+    ).toBeInTheDocument();
+    expect(
       screen.getByText(/Inconclusive causes: Cooling fan not operating/),
     ).toBeInTheDocument();
+    expect(screen.getByText("[?]")).toBeInTheDocument();
+  });
+
+  it("exposes print and download controls that invoke the browser APIs", async () => {
+    getSummaryMock.mockResolvedValue(summaryFixture);
+    getMarkdownMock.mockResolvedValue("# Session summary markdown");
+
+    const printSpy = vi.spyOn(window, "print").mockImplementation(() => {});
+    const createObjectURL = vi.fn(() => "blob:summary");
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal("URL", {
+      ...URL,
+      createObjectURL,
+      revokeObjectURL,
+    });
+    const clickSpy = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => {});
+
+    render(<SummaryPanel sessionId="sess-1" />);
+    fireEvent.click(screen.getByRole("button", { name: "Show summary" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Print / Save as PDF" }),
+      ).toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: "Download" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copy" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Print / Save as PDF" }));
+    expect(printSpy).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Download" }));
+    expect(createObjectURL).toHaveBeenCalled();
+    expect(clickSpy).toHaveBeenCalled();
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:summary");
+
+    printSpy.mockRestore();
+    clickSpy.mockRestore();
+    vi.unstubAllGlobals();
   });
 
   it("auto-loads when autoOpen is set", async () => {
