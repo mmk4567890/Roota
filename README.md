@@ -1,23 +1,56 @@
 # Roota
 
-Roota is a stateful fault-isolation assistant for industrial variable-frequency drives (VFDs). A technician starts a session for a supported fault, Roota recommends the next documented diagnostic check, the technician reports the result in natural language, and Roota updates the diagnostic state (facts known, causes ruled out / still open / confirmed) and picks the next check. Every recommendation cites the technical manual.
+[![CI](https://github.com/mmk4567890/roota/actions/workflows/ci.yml/badge.svg)](https://github.com/mmk4567890/roota/actions/workflows/ci.yml)
 
-## Project structure
+Stateful fault isolation for industrial variable-frequency drives.
 
+## Why
+
+Technicians diagnose drive faults from long PDF manuals. Roota walks them through the documented checks one at a time, updates what is known from their answers, and cites the manual page for every recommendation — so the next step is always grounded in the procedure, not guesswork.
+
+## Screenshots
+
+![Session screen](docs/session.png)
+
+![Session summary](docs/summary.png)
+
+> Replace these placeholders with real captures of a live session and a completed summary.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  UI[React UI] --> API[FastAPI]
+  API --> Engine[Diagnostic engine]
+  API --> Log[(Session event log<br/>SQLite)]
+  API --> Parser[Observation parser<br/>keyword or LLM]
+  API --> Retrieval[Manual retrieval<br/>Chroma]
+  Engine --> Graphs[Fault graphs JSON]
+  Retrieval --> Manuals[Ingested manuals]
 ```
-roota/
-  frontend/   # React + Vite + TypeScript + Tailwind
-  backend/    # Python + FastAPI
-  README.md
-  .gitignore
+
+Design decisions:
+
+- The diagnostic engine is deterministic and separate from the language parser — the parser only translates technician wording into field values.
+- Sessions are event-sourced (append-only SQLite log) with undo; current state is always replayed.
+- Causes can be confirmed, ruled out, open, or inconclusive when checks finish without a clear outcome.
+- Every check and corrective action carries a manual citation (`doc_id`, section, page).
+- The default keyword parser runs fully offline; the Anthropic parser is optional.
+
+## Quick start
+
+**Backend** (Python 3.11+):
+
+```bash
+cd backend
+python -m venv .venv
+# Windows: .venv\Scripts\activate
+# macOS / Linux: source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
 ```
 
-## Prerequisites
-
-- Node.js 20+ and npm
-- Python 3.11+
-
-## Frontend
+**Frontend** (Node 20+):
 
 ```bash
 cd frontend
@@ -25,101 +58,50 @@ npm install
 npm run dev
 ```
 
-Open the URL shown in the terminal (typically http://localhost:5173).
+Open the Vite URL (typically http://localhost:5173). API docs: http://localhost:8000/api/docs.
 
-Run frontend tests:
+Copy `.env.example` for optional settings (`ROOTA_PARSER=keyword` by default).
 
-```bash
-cd frontend
-npm test
-```
+## Getting the manual
 
-## Backend
+The ABB ACS580 firmware manual (document **3AXD50000016097**, Rev J) is not included for copyright reasons. Download it from [ABB's library](https://library.abb.com/), place the PDF in `docs/manuals/`, then from `backend/`:
 
 ```bash
-cd backend
-python -m venv .venv
-
-# Windows
-.venv\Scripts\activate
-
-# macOS / Linux
-source .venv/bin/activate
-
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
-```
-
-Health check: [http://localhost:8000/health](http://localhost:8000/health) · API docs (Swagger): [http://localhost:8000/api/docs](http://localhost:8000/api/docs). `/docs` itself lists ingested manuals.
-
-### Configuration
-
-Copy `.env.example` and set what you need. Everything has a working offline default.
-
-| Variable | Default | Purpose |
-|---|---|---|
-| `ROOTA_PARSER` | `keyword` | `keyword` (offline rules) or `anthropic` (LLM translation) |
-| `ANTHROPIC_API_KEY` | none | Required when `ROOTA_PARSER=anthropic`; the server will not start without it |
-| `ROOTA_LLM_MODEL` | `claude-sonnet-5-5` | Model used by the Anthropic parser |
-| `ROOTA_DB_PATH` | `backend/data/roota.db` | Session event log (SQLite) |
-| `ROOTA_CHROMA_DIR` | `backend/data/chroma` | Vector store for ingested manuals |
-| `ROOTA_DOCS_DB_PATH` | `backend/data/docs.db` | Registry of ingested manuals |
-
-Outbound HTTPS (the Anthropic API, the embedding model download) verifies certificates against the operating system's trust store, not Python's bundled list. That keeps it working behind antivirus HTTPS scanning (e.g. Avast Web Shield) or a corporate proxy, with verification fully on.
-
-### Manuals
-
-Put PDFs in `docs/manuals/` (gitignored), then from `backend/`:
-
-```bash
-python -m app.retrieval.prefetch          # download the local embedding model once
-python -m app.retrieval.prefetch --check  # verify the model is usable offline (no download)
-python -m app.retrieval.ingest ../docs/manuals/<file>.pdf --doc-id <id> --title "<title>"
+python -m app.retrieval.prefetch
+python -m app.retrieval.ingest ../docs/manuals/<file>.pdf --doc-id abb_acs580_fw --title "ABB ACS580 firmware manual"
 python scripts/check_citations.py
 ```
 
-On plant floors without network, run `python -m app.retrieval.prefetch` once on a connected machine first so Chroma's ONNX embedding model is cached; `--check` confirms the cache is ready without touching the network. The ingest command lists any pages with no extractable text (scanned pages). `check_citations.py` lists every graph citation that points at a missing manual, a page that does not exist, or a page with no text.
+Without the manual Roota still runs, but recommendations show no cited passages.
 
-### Parser evaluation
+## Try it
+
+Start a session for **ABB ACS580 drive overtemperature**, then type observations such as:
+
+1. `The cooling fan is not running.` → root cause: cooling fan failure.
+2. `Fan is spinning fine but the vents are packed with dust.` → continues; then `Heatsink fins are full of dust.` → blocked airflow / dusty heatsink.
+3. `Fan is fine, vents clear, heatsink clean.` then `Room is cool.` then `Motor matches the drive.` → all causes ruled out → escalate.
+4. Escalation path with inconclusive fan: `The cooling fan is noisy.` then clear the rest (`vents clear`, `heatsink clean`, `room is cool`, `motor matches the drive`) → escalate, naming the noisy fan as inconclusive.
+
+Use **Enter values directly** if you want to set fields without natural language.
+
+## Testing
 
 ```bash
-python scripts/eval_parser.py --parser keyword
-python scripts/eval_parser.py --parser anthropic --limit 5   # calls the real API; --limit caps cost
-```
-
-### Run backend tests
-
-```bash
+# Backend — expect 249 passed, 3 skipped (live tests opt-in with --live)
 cd backend
-# Use the project venv
-# Windows: .venv\Scripts\activate
-# macOS / Linux: source .venv/bin/activate
-
 python -X dev -m pytest -W error::DeprecationWarning -W error::ResourceWarning
+
+# Keyword parser eval against the shipped ACS580 graph — 70/70 cases, 83/83 fields
+python scripts/eval_parser.py --parser keyword
+
+# Frontend — expect 28 passed; also type-check + production build
+cd frontend
+npm test
+npm run build
 ```
 
-A plain `pytest` never calls the Anthropic API or downloads models, whatever is set in your shell. Live checks (real API + real embeddings) are opt-in:
+## Roadmap
 
-```bash
-python -X dev -m pytest --live tests/live
-```
-
-That command calls the real Anthropic API (requires `ANTHROPIC_API_KEY`) and may download Chroma's embedding model on first run.
-
-## Session summary
-
-```bash
-# JSON
-curl -s http://localhost:8000/sessions/<id>/summary
-
-# Markdown report
-curl -s "http://localhost:8000/sessions/<id>/summary?format=markdown"
-```
-
-The technician UI has a Summary panel with copy and download.
-
-## What's next
-
-- Photo observations (multipart image on `/observations`)
-- End-to-end demo script against the keyword parser
-- Clear remaining `TODO(roota)` notes in `backend/app/graphs/data/`
+- More fault graphs beyond ACS580 overtemperature
+- Photo observations (keypad / heatsink images as structured facts)
