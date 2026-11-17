@@ -200,6 +200,12 @@ def test_accepts_todo_annotations_on_any_object() -> None:
     payload["causes"][0]["ruled_out_when"]["_todo"] = "TODO(roota): threshold note"
     graph = FaultGraph.model_validate(payload)
     assert graph.todo == "TODO(roota): graph-level note"
+    # Internal annotations stay on the model but never serialize to clients.
+    dumped = graph.model_dump(mode="json", by_alias=True)
+    assert "_todo" not in dumped
+    assert "todo" not in dumped
+    assert "_todo" not in dumped["checks"][0]["source"]
+    assert "_todo" not in dumped["fields"][0]
 
 
 def test_rejects_misspelled_cause_key() -> None:

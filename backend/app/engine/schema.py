@@ -29,7 +29,8 @@ class GraphModel(BaseModel):
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
-    todo: str | None = Field(default=None, alias="_todo")
+    # Graph-file annotation only — never serialize to API clients.
+    todo: str | None = Field(default=None, alias="_todo", exclude=True)
 
 
 class FieldSpec(GraphModel):

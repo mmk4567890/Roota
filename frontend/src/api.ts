@@ -30,7 +30,6 @@ export interface Source {
   doc_id: string;
   section: string;
   page: number | null;
-  _todo?: string | null;
 }
 
 export interface Check {
@@ -39,7 +38,6 @@ export interface Check {
   reason: string;
   collects: string[];
   source: Source;
-  _todo?: string | null;
 }
 
 export interface Evidence {

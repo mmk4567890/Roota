@@ -156,6 +156,70 @@ def test_summary_citations_include_passage_field(client: TestClient) -> None:
         assert cite["passage"] is None or isinstance(cite["passage"], str)
 
 
+def _assert_no_internal_keys(obj: object, path: str = "$") -> None:
+    if isinstance(obj, dict):
+        for key, value in obj.items():
+            assert not str(key).startswith("_"), f"internal key at {path}.{key}"
+            _assert_no_internal_keys(value, f"{path}.{key}")
+    elif isinstance(obj, list):
+        for index, item in enumerate(obj):
+            _assert_no_internal_keys(item, f"{path}[{index}]")
+
+
+def test_summary_json_and_markdown_omit_internal_source_fields(
+    client: TestClient,
+) -> None:
+    """Graph ``_todo`` annotations must never reach summary clients."""
+    created = client.post(
+        "/sessions",
+        json={
+            "fault_id": "acs580_overtemperature",
+            "equipment_label": "Line 8",
+        },
+    )
+    session_id = created.json()["id"]
+    # motor_exceeds_drive_power.action_source carries a ``_todo`` in the graph JSON.
+    client.post(
+        f"/sessions/{session_id}/facts",
+        json={
+            "facts": {
+                "fan_status": "normal",
+                "airflow_obstruction": "none",
+                "heatsink_condition": "clean",
+                "ambient_above_derating_temp": "no",
+                "motor_power_vs_drive": "exceeds",
+            }
+        },
+    )
+    body = client.get(f"/sessions/{session_id}/summary").json()
+    assert body["root_cause"] is not None
+    assert body["root_cause"]["cause_id"] == "motor_exceeds_drive_power"
+    _assert_no_internal_keys(body["root_cause"]["source"])
+    _assert_no_internal_keys(body["citations"])
+    assert "_todo" not in body["root_cause"]["source"]
+
+    md = client.get(f"/sessions/{session_id}/summary?format=markdown")
+    assert md.status_code == 200, md.text
+    assert "_todo" not in md.text
+    assert "TODO(roota)" not in md.text
+
+
+def test_session_view_sources_omit_internal_fields(client: TestClient) -> None:
+    created = client.post(
+        "/sessions",
+        json={
+            "fault_id": "acs580_overtemperature",
+            "equipment_label": "Line 2",
+        },
+    )
+    assert created.status_code == 201, created.text
+    state = created.json()["state"]
+    check = state["next_action"]["check"]
+    assert check is not None
+    _assert_no_internal_keys(check)
+    _assert_no_internal_keys(check["source"])
+
+
 def test_summary_escalation_names_inconclusive_fan(client: TestClient) -> None:
     created = client.post(
         "/sessions",
