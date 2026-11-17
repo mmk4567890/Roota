@@ -84,11 +84,26 @@ def _extract_fan_status(lower: str, extracted: dict[str, object]) -> None:
         return
     if re.search(r"not\s+running|stopped|dead|\bisn'?t\s+running|is\s+not\s+running", lower):
         extracted["fan_status"] = "not_running"
-    elif re.search(r"not\s+noisy|isn'?t\s+noisy|no\s+noise|not\s+rattl|not\s+squeak", lower):
-        extracted["fan_status"] = "normal"
-    elif re.search(r"\bnoisy\b|rattl|squeak", lower):
+        return
+
+    not_noisy = bool(
+        re.search(r"not\s+noisy|isn'?t\s+noisy|no\s+noise|not\s+rattl|not\s+squeak", lower)
+    )
+    noisy = bool(re.search(r"\bnoisy\b|rattl|squeak", lower))
+    running = bool(re.search(r"running|spinning|fine|normal|ok\b", lower))
+
+    # "Not noisy" alone does not say the fan is operating — leave unclear unless
+    # the text also affirms running/spinning (or another normal cue).
+    if not_noisy:
+        if running:
+            extracted["fan_status"] = "normal"
+        else:
+            extracted["fan_status"] = UNCLEAR
+        return
+    if noisy:
         extracted["fan_status"] = "noisy"
-    elif re.search(r"running|fine|normal|spinning|ok\b", lower):
+        return
+    if running:
         extracted["fan_status"] = "normal"
 
 

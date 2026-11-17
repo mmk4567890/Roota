@@ -50,8 +50,29 @@ def test_fan_not_running(parser: KeywordParser, acs580: FaultGraph) -> None:
     assert result.extracted["fan_status"] == "not_running"
 
 
-def test_fan_not_noisy_is_normal(parser: KeywordParser, acs580: FaultGraph) -> None:
-    result = parser.parse("The fan is not noisy.", acs580, ["fan_status"])
+def test_fan_not_noisy_alone_is_unclear(
+    parser: KeywordParser, acs580: FaultGraph
+) -> None:
+    raw = parser.parse("The fan is not noisy.", acs580, ["fan_status"])
+    assert raw.extracted["fan_status"] == UNCLEAR
+    parsed = validate_parse(raw, acs580)
+    assert "fan_status" not in parsed.extracted
+    assert parsed.unclear_fields == ["fan_status"]
+
+
+def test_fan_running_and_not_noisy_is_normal(
+    parser: KeywordParser, acs580: FaultGraph
+) -> None:
+    result = parser.parse(
+        "The fan is running and not noisy.", acs580, ["fan_status"]
+    )
+    assert result.extracted["fan_status"] == "normal"
+
+
+def test_fan_spinning_not_noisy_is_normal(
+    parser: KeywordParser, acs580: FaultGraph
+) -> None:
+    result = parser.parse("Fan is spinning, not noisy.", acs580, ["fan_status"])
     assert result.extracted["fan_status"] == "normal"
 
 

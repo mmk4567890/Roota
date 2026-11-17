@@ -8,8 +8,11 @@
 {"id": "fan_rattling", "text": "Fan is rattling a bit.", "expected": {"fan_status": "noisy"}}
 {"id": "fan_fine", "text": "Fan is fine.", "expected": {"fan_status": "normal"}}
 {"id": "fan_spinning", "text": "Fan is spinning.", "expected": {"fan_status": "normal"}}
-{"id": "fan_not_noisy", "text": "The fan is not noisy.", "expected": {"fan_status": "normal"}}
-{"id": "fan_isnt_noisy", "text": "Fan isn't noisy today.", "expected": {"fan_status": "normal"}}
+{"id": "fan_not_noisy_unclear", "text": "The fan is not noisy.", "expected": {"fan_status": "unclear"}}
+{"id": "fan_isnt_noisy_unclear", "text": "Fan isn't noisy today.", "expected": {"fan_status": "unclear"}}
+{"id": "fan_no_noise_unclear", "text": "Cooling fan has no noise.", "expected": {"fan_status": "unclear"}}
+{"id": "fan_running_not_noisy", "text": "The fan is running and not noisy.", "expected": {"fan_status": "normal"}}
+{"id": "fan_spinning_not_noisy", "text": "Fan is spinning, not noisy.", "expected": {"fan_status": "normal"}}
 {"id": "heatsink_clean_only", "text": "Heatsink is clean.", "expected": {"heatsink_condition": "clean"}}
 {"id": "heatsink_dusty", "text": "The heatsink is dusty.", "expected": {"heatsink_condition": "dusty"}}
 {"id": "heatsink_full_of_dust", "text": "Heatsink fins are full of dust.", "expected": {"heatsink_condition": "dusty"}}
