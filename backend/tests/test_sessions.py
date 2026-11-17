@@ -145,14 +145,20 @@ def test_facts_invalid_number_returns_422(client: TestClient) -> None:
     assert "load_percent" in response.json()["detail"]
 
 
-def test_facts_unclear_allowed(client: TestClient) -> None:
+def test_facts_unclear_marks_inconclusive_and_continues(client: TestClient) -> None:
     session_id = _create_session(client)["id"]
     response = client.post(
         f"/sessions/{session_id}/facts",
         json={"facts": {"fan_status": "unclear"}, "check_id": "check_fan_operation"},
     )
     assert response.status_code == 200, response.text
-    assert response.json()["state"]["next_action"]["type"] == "need_info"
+    body = response.json()
+    assert body["state"]["next_action"]["type"] == "check"
+    assert body["state"]["next_action"]["check"]["id"] == "check_airflow_path"
+    fan = next(
+        c for c in body["state"]["causes"] if c["cause_id"] == "cooling_fan_failure"
+    )
+    assert fan["status"] == "inconclusive"
 
 
 def test_facts_unknown_check_id_returns_422(client: TestClient) -> None:

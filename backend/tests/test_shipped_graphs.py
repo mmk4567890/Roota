@@ -177,7 +177,8 @@ def test_noisy_fan_escalates_when_everything_else_is_ruled_out(
     assert state.next_action.type == "escalate"
     assert state.next_action.cause_id == "cooling_fan_failure"
     assert "Cooling fan not operating" in state.next_action.message
-    assert "fan_status='noisy'" in state.next_action.message
+    assert "Fan status: Noisy" in state.next_action.message
+    assert "fan_status" not in state.next_action.message
 
 
 def test_dusty_heatsink_confirms_airflow_cause(acs580: FaultGraph) -> None:
@@ -236,10 +237,74 @@ def test_everything_ruled_out_escalates(acs580: FaultGraph) -> None:
     assert action.type == "escalate"
 
 
-def test_unclear_answer_asks_again_instead_of_guessing(acs580: FaultGraph) -> None:
-    action = evaluate(acs580, {"fan_status": "unclear"}).next_action
-    assert action.type == "need_info"
-    assert action.fields == ["fan_status"]
+def test_unclear_answer_marks_inconclusive_and_continues(acs580: FaultGraph) -> None:
+    from app.engine.engine import UNCLEAR_REASON
+
+    state = evaluate(acs580, {"fan_status": "unclear"})
+    by_id = {cause.cause_id: cause.status for cause in state.causes}
+    assert by_id["cooling_fan_failure"] == "inconclusive"
+    assert state.next_action.type == "check"
+    assert state.next_action.check is not None
+    assert state.next_action.check.id == "check_airflow_path"
+
+    # Exhaust remaining causes → escalate names the unclear fan like noisy.
+    exhausted = evaluate(
+        acs580,
+        {
+            "fan_status": "unclear",
+            "airflow_obstruction": "none",
+            "heatsink_condition": "clean",
+            "ambient_above_derating_temp": "no",
+            "motor_power_vs_drive": "within",
+        },
+    )
+    assert exhausted.next_action.type == "escalate"
+    assert "Cooling fan not operating" in exhausted.next_action.message
+    assert UNCLEAR_REASON in exhausted.next_action.message
+    assert "fan_status" not in exhausted.next_action.message
+
+
+def test_escalation_reason_never_contains_raw_field_ids(acs580: FaultGraph) -> None:
+    """User-facing escalate / summary strings must use labels, not field ids."""
+    from app.summary import build_summary, render_markdown
+
+    state = evaluate(
+        acs580,
+        {
+            "fan_status": "noisy",
+            "airflow_obstruction": "none",
+            "heatsink_condition": "clean",
+            "ambient_above_derating_temp": "no",
+            "motor_power_vs_drive": "within",
+        },
+    )
+    assert state.next_action.type == "escalate"
+    message = state.next_action.message
+    field_names = [field.name for field in acs580.fields]
+    for name in field_names:
+        assert name not in message, f"raw field id {name!r} leaked into escalate message"
+
+    # Summary / markdown copy the same labeled reason.
+    from datetime import datetime, timezone
+    from uuid import uuid4
+
+    from app.models import Event
+
+    summary = build_summary(
+        session_id=uuid4(),
+        equipment_label="Line 1",
+        started_at=datetime.now(timezone.utc),
+        graph=acs580,
+        events=[],
+        state=state,
+    )
+    assert summary.escalation_reason is not None
+    for name in field_names:
+        assert name not in summary.escalation_reason
+        assert name not in render_markdown(summary)
+        for cause in summary.causes:
+            for bit in cause.because:
+                assert name not in bit
 
 
 # --- offline parsing and the API ---
@@ -282,6 +347,8 @@ def test_api_session_on_the_real_graph(client: TestClient) -> None:
 
 
 def test_api_fan_not_noisy_alone_is_unclear_with_message(client: TestClient) -> None:
+    from app.routers.sessions import UNCLEAR_MOVED_ON_MESSAGE
+
     created = client.post(
         "/sessions",
         json={"fault_id": "acs580_overtemperature", "equipment_label": "Line 6 ACS580"},
@@ -297,11 +364,16 @@ def test_api_fan_not_noisy_alone_is_unclear_with_message(client: TestClient) -> 
     body = observed.json()
     assert body["parse"]["extracted"] == {}
     assert body["parse"]["unclear_fields"] == ["fan_status"]
-    assert body["message"] is not None
-    assert "whether the fan is running" in body["message"]
-    assert "running normally" in body["message"]
-    assert "not running" in body["message"]
+    # Parser still records the clarifying notes; the API surfaces the move-on message.
+    assert "whether the fan is running" in body["parse"]["notes"]
+    assert body["message"] == UNCLEAR_MOVED_ON_MESSAGE
     assert body["state"]["facts"].get("fan_status") == "unclear"
+    fan = next(
+        c for c in body["state"]["causes"] if c["cause_id"] == "cooling_fan_failure"
+    )
+    assert fan["status"] == "inconclusive"
+    assert body["state"]["next_action"]["type"] == "check"
+    assert body["state"]["next_action"]["check"]["id"] == "check_airflow_path"
 
 
 def test_api_ambient_between_derating_limits_is_unclear_with_message(
@@ -333,10 +405,16 @@ def test_api_ambient_between_derating_limits_is_unclear_with_message(
     body = ambient.json()
     assert body["parse"]["extracted"] == {}
     assert body["parse"]["unclear_fields"] == ["ambient_above_derating_temp"]
-    assert body["message"] is not None
-    assert "45" in body["message"]
-    assert "40" in body["message"] and "50" in body["message"]
-    assert "frame" in body["message"].lower()
-    assert "ip" in body["message"].lower()
-    assert "derating" in body["message"].lower()
+    from app.routers.sessions import UNCLEAR_MOVED_ON_MESSAGE
+
+    assert "45" in body["parse"]["notes"]
+    assert "derating" in body["parse"]["notes"].lower()
+    assert body["message"] == UNCLEAR_MOVED_ON_MESSAGE
     assert body["state"]["facts"].get("ambient_above_derating_temp") == "unclear"
+    load = next(
+        c
+        for c in body["state"]["causes"]
+        if c["cause_id"] == "load_above_derated_capacity"
+    )
+    assert load["status"] == "inconclusive"
+    assert body["state"]["next_action"]["type"] == "check"

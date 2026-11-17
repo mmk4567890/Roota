@@ -562,6 +562,9 @@ def _expected_fields_from_state(
     return []
 
 
+UNCLEAR_MOVED_ON_MESSAGE = "Marked as not sure. Moving to the next check."
+
+
 def _observation_message(parsed: ParseResult) -> str | None:
     if parsed.rejected:
         parts = [
@@ -576,6 +579,9 @@ def _observation_message(parsed: ParseResult) -> str | None:
             "I didn't understand any diagnostic field values in that observation. "
             "Please re-phrase using clearer measurements or statuses."
         )
+    # Unclear answers mark causes inconclusive and continue — tell the tech.
+    if parsed.unclear_fields:
+        return UNCLEAR_MOVED_ON_MESSAGE
     # Parser notes explain ambiguous values (e.g. ambient between derating limits).
     notes = parsed.notes.strip()
     if notes:

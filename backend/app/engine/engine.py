@@ -18,7 +18,11 @@ from app.engine.schema import (
     FieldCondition,
     FieldSpec,
     Source,
+    format_fact,
 )
+
+# Stored on inconclusive causes / escalation when the technician answered "unclear".
+UNCLEAR_REASON = "Technician wasn't sure"
 
 
 class Truth(Enum):
@@ -108,7 +112,9 @@ def evaluate(graph: FaultGraph, facts: dict[str, Any]) -> DiagnosticState:
     checks_completed = [
         check.id
         for check in graph.checks
-        if all(_is_known(facts_snapshot, field_name) for field_name in check.collects)
+        if all(
+            _is_answered(facts_snapshot, field_name) for field_name in check.collects
+        )
     ]
 
     next_action = _decide_next_action(
@@ -245,9 +251,26 @@ def _cause_status(
         for check_id in cause.checks
         for field_name in check_by_id[check_id].collects
     ]
+    # "Not sure" blocks confirming or ruling out — mark inconclusive now and
+    # skip any remaining checks for this cause (same outcome family as noisy).
+    unclear_collectable = [
+        field_name
+        for field_name in collectable
+        if facts.get(field_name) == UNCLEAR
+    ]
+    if unclear_collectable:
+        return CauseStatus(
+            cause_id=cause.id,
+            name=cause.name,
+            status="inconclusive",
+            because=_unique_sorted(unclear_collectable),
+            promoted=promoted,
+        )
     # Checks are complete but neither confirm nor rule out → inconclusive, so
     # investigation can continue with the remaining open causes.
-    if collectable and all(_is_known(facts, field_name) for field_name in collectable):
+    if collectable and all(
+        _is_answered(facts, field_name) for field_name in collectable
+    ):
         return CauseStatus(
             cause_id=cause.id,
             name=cause.name,
@@ -277,14 +300,18 @@ def _decide_next_action(
     contradictions = [item for item in cause_statuses if item.status == "contradiction"]
     if contradictions:
         cause = contradictions[0]
-        conflict = ", ".join(cause.because) if cause.because else "unknown facts"
+        conflict = (
+            _format_reason_bits(cause.because, facts, field_by_name)
+            if cause.because
+            else "unknown facts"
+        )
         return NextAction(
             type="escalate",
             cause_id=cause.cause_id,
             fields=list(cause.because),
             message=(
-                f"Contradiction on cause '{cause.name}' "
-                f"({cause.cause_id}): confirmed and ruled out by facts [{conflict}]."
+                f"Contradiction on cause '{cause.name}': "
+                f"confirmed and ruled out by facts [{conflict}]."
             ),
         )
 
@@ -302,32 +329,20 @@ def _decide_next_action(
 
     open_causes = _ordered_open_causes(graph, facts, status_by_id)
     if not open_causes:
-        return _escalate_exhausted(cause_statuses, facts)
+        return _escalate_exhausted(cause_statuses, facts, field_by_name)
 
     current = open_causes[0]
     for check_id in current.checks:
         check = check_by_id[check_id]
+        # Unanswered only — "unclear" counts as answered and marks the cause
+        # inconclusive above, so we never re-ask via need_info.
         unknown_fields = [
             field_name
             for field_name in check.collects
-            if not _is_known(facts, field_name)
+            if not _is_answered(facts, field_name)
         ]
         if not unknown_fields:
             continue
-
-        unclear_fields = [
-            field_name
-            for field_name in unknown_fields
-            if facts.get(field_name) == UNCLEAR
-        ]
-        if unclear_fields:
-            primary = unclear_fields[0]
-            return NextAction(
-                type="need_info",
-                cause_id=current.id,
-                fields=unclear_fields,
-                message=field_by_name[primary].ask,
-            )
 
         return NextAction(
             type="check",
@@ -352,6 +367,7 @@ def _decide_next_action(
 def _escalate_exhausted(
     cause_statuses: list[CauseStatus],
     facts: dict[str, Any],
+    field_by_name: dict[str, FieldSpec],
 ) -> NextAction:
     """Escalate when nothing remains open and nothing is confirmed."""
     inconclusive = [item for item in cause_statuses if item.status == "inconclusive"]
@@ -363,12 +379,7 @@ def _escalate_exhausted(
 
     parts: list[str] = []
     for item in inconclusive:
-        fact_bits = [
-            f"{field}={facts[field]!r}"
-            for field in item.because
-            if field in facts
-        ]
-        why = ", ".join(fact_bits) if fact_bits else ", ".join(item.because)
+        why = _format_reason_bits(item.because, facts, field_by_name)
         if why:
             parts.append(f"{item.name} ({why})")
         else:
@@ -383,6 +394,27 @@ def _escalate_exhausted(
             f"Inconclusive: {'; '.join(parts)}."
         ),
     )
+
+
+def _format_reason_bits(
+    fields: list[str],
+    facts: dict[str, Any],
+    field_by_name: dict[str, FieldSpec],
+) -> str:
+    """User-facing reason fragments: ``Fan status: Noisy`` or unclear wording."""
+    bits: list[str] = []
+    for field_name in fields:
+        if field_name not in facts:
+            continue
+        value = facts[field_name]
+        if value == UNCLEAR:
+            bits.append(UNCLEAR_REASON)
+            continue
+        spec = field_by_name.get(field_name)
+        if spec is None:
+            raise ValueError(f"unknown field '{field_name}' in cause because")
+        bits.append(format_fact(spec, value))
+    return ", ".join(bits)
 
 
 def _ordered_open_causes(
@@ -417,9 +449,15 @@ def _is_promoted(cause: Cause, facts: dict[str, Any]) -> bool:
 
 
 def _is_known(facts: dict[str, Any], field_name: str) -> bool:
+    """True when the field has a decisive value (not missing, not unclear)."""
     if field_name not in facts:
         return False
     return facts[field_name] != UNCLEAR
+
+
+def _is_answered(facts: dict[str, Any], field_name: str) -> bool:
+    """True when the technician has reported the field, including unclear."""
+    return field_name in facts
 
 
 def _unique_sorted(fields: Iterable[str]) -> list[str]:

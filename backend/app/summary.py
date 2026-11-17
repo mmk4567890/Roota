@@ -12,14 +12,16 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-from app.engine.engine import CauseStatus, DiagnosticState
+from app.engine.engine import UNCLEAR_REASON, CauseStatus, DiagnosticState
 from app.engine.replay import is_event_undone, session_is_closed
 from app.engine.schema import (
+    UNCLEAR,
     FaultGraph,
     FieldSpec,
     Source,
     display_page,
     field_value_label,
+    format_fact,
 )
 from app.manuals import full_doc_citation, section_short_label, short_doc_name
 from app.models import Event
@@ -116,7 +118,7 @@ def build_summary(
         status="closed" if closed else "active",
         started_at=started_at,
         closed_at=closed_at,
-        causes=_labeled_causes(graph, state.causes),
+        causes=_labeled_causes(graph, state.causes, state.facts),
         root_cause=root_cause,
         escalation_reason=escalation_reason,
         facts=_fact_reports(events, graph),
@@ -208,17 +210,38 @@ def _field_spec(graph: FaultGraph, field_name: str) -> FieldSpec | None:
     return next((field for field in graph.fields if field.name == field_name), None)
 
 
-def _because_labels(graph: FaultGraph, because: list[str]) -> list[str]:
+def _because_labels(
+    graph: FaultGraph,
+    because: list[str],
+    facts: dict[str, Any],
+) -> list[str]:
+    """User-facing reasons: ``Fan status: Noisy`` or unclear wording."""
     labels: list[str] = []
     for name in because:
         spec = _field_spec(graph, name)
-        labels.append(spec.label if spec is not None else name)
+        if spec is None:
+            labels.append(name)
+            continue
+        if name not in facts:
+            labels.append(spec.label)
+            continue
+        value = facts[name]
+        if value == UNCLEAR:
+            labels.append(UNCLEAR_REASON)
+        else:
+            labels.append(format_fact(spec, value))
     return labels
 
 
-def _labeled_causes(graph: FaultGraph, causes: list[CauseStatus]) -> list[CauseStatus]:
+def _labeled_causes(
+    graph: FaultGraph,
+    causes: list[CauseStatus],
+    facts: dict[str, Any],
+) -> list[CauseStatus]:
     return [
-        cause.model_copy(update={"because": _because_labels(graph, cause.because)})
+        cause.model_copy(
+            update={"because": _because_labels(graph, cause.because, facts)}
+        )
         for cause in causes
     ]
 

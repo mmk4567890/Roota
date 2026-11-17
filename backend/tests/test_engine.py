@@ -126,14 +126,21 @@ def test_load_ruled_out_returns_to_highest_priority_open(
     assert state.next_action.cause_id == "cooling_fan_failure"
 
 
-def test_scenario_4_fan_unclear_need_info(overtemperature: FaultGraph) -> None:
+def test_scenario_4_fan_unclear_marks_inconclusive_and_continues(
+    overtemperature: FaultGraph,
+) -> None:
+    from app.engine.engine import UNCLEAR_REASON
+
     state = evaluate(overtemperature, {"fan_status": UNCLEAR})
 
-    fan_field = next(field for field in overtemperature.fields if field.name == "fan_status")
-    assert state.next_action.type == "need_info"
-    assert state.next_action.fields == ["fan_status"]
-    assert state.next_action.message == fan_field.ask
-    assert state.next_action.cause_id == "cooling_fan_failure"
+    assert _status_map(state)["cooling_fan_failure"] == "inconclusive"
+    fan_status = next(c for c in state.causes if c.cause_id == "cooling_fan_failure")
+    assert fan_status.because == ["fan_status"]
+    assert state.next_action.type == "check"
+    assert state.next_action.check is not None
+    assert state.next_action.check.id == "check_airflow_path"
+    # Escalation wording is built later; reason bit for unclear is fixed.
+    assert UNCLEAR_REASON == "Technician wasn't sure"
 
 
 def test_all_causes_ruled_out_escalates(overtemperature: FaultGraph) -> None:
@@ -352,7 +359,9 @@ def test_threshold_carrier_exactly_8(overtemperature: FaultGraph) -> None:
     assert _status_map(state)["carrier_frequency_too_high"] == "ruled_out"
 
 
-def test_unclear_on_number_field_need_info(overtemperature: FaultGraph) -> None:
+def test_unclear_on_number_field_marks_inconclusive_and_continues(
+    overtemperature: FaultGraph,
+) -> None:
     state = evaluate(
         overtemperature,
         {
@@ -364,13 +373,10 @@ def test_unclear_on_number_field_need_info(overtemperature: FaultGraph) -> None:
         },
     )
 
-    ambient = next(
-        field for field in overtemperature.fields if field.name == "ambient_temp_c"
-    )
-    assert state.next_action.type == "need_info"
-    assert state.next_action.fields == ["ambient_temp_c"]
-    assert state.next_action.message == ambient.ask
-    assert state.next_action.cause_id == "high_ambient_temperature"
+    assert _status_map(state)["high_ambient_temperature"] == "inconclusive"
+    assert state.next_action.type == "check"
+    assert state.next_action.check is not None
+    assert state.next_action.check.id == "check_carrier_frequency"
 
 
 def test_unknown_fact_field_raises(overtemperature: FaultGraph) -> None:
@@ -612,7 +618,8 @@ def test_graph_gap_escalates() -> None:
     assert state.next_action.type == "escalate"
     assert state.next_action.cause_id == "unresolvable"
     assert "Inconclusive: Unresolvable" in state.next_action.message
-    assert "observed='done'" in state.next_action.message
+    assert "Observed: Done" in state.next_action.message
+    assert "observed=" not in state.next_action.message
 
 
 # --- Review additions ---

@@ -26,18 +26,28 @@ def _create_session(client: TestClient) -> dict:
     return response.json()
 
 
-def test_evidence_status_none_for_need_info(client: TestClient) -> None:
+def test_evidence_status_none_for_escalate(client: TestClient) -> None:
     created = _create_session(client)
     session_id = created["id"]
     assert created["state"]["next_action"]["evidence_status"] == "no_manual"
 
+    # Rule everything out so the session escalates (no manual evidence on escalate).
     response = client.post(
         f"/sessions/{session_id}/facts",
-        json={"facts": {"fan_status": "unclear"}, "check_id": "check_fan_operation"},
+        json={
+            "facts": {
+                "fan_status": "normal",
+                "airflow_obstruction": "none",
+                "heatsink_condition": "clean",
+                "load_percent": 50,
+                "ambient_temp_c": 25,
+                "carrier_frequency_khz": 4,
+            }
+        },
     )
     assert response.status_code == 200, response.text
     action = response.json()["state"]["next_action"]
-    assert action["type"] == "need_info"
+    assert action["type"] == "escalate"
     assert action["evidence_status"] is None
     assert action["evidence"] is None
     assert action["evidence_error"] is None

@@ -254,4 +254,8 @@ def test_summary_escalation_names_inconclusive_fan(client: TestClient) -> None:
     assert summary["root_cause"] is None
     assert summary["escalation_reason"] is not None
     assert "Cooling fan not operating" in summary["escalation_reason"]
+    assert "Fan status: Noisy" in summary["escalation_reason"]
+    assert "fan_status" not in summary["escalation_reason"]
     assert any(c["status"] == "inconclusive" for c in summary["causes"])
+    fan = next(c for c in summary["causes"] if c["cause_id"] == "cooling_fan_failure")
+    assert fan["because"] == ["Fan status: Noisy"]
