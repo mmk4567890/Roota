@@ -5,6 +5,7 @@ import re
 from app.engine.engine import Evidence
 from app.engine.schema import Source
 from app.retrieval.ingest import ENTRY_START_RE
+from app.retrieval.passage import reflow_passage
 from app.retrieval.store import TBD_MANUAL, ManualStore, StoredChunk
 
 def get_evidence(
@@ -53,7 +54,7 @@ def get_evidence(
             title=chunk.title,
             page=chunk.page,
             section=chunk.section,
-            text=chunk.text,
+            text=reflow_passage(chunk.text),
             kind="cited",
         )
         for chunk in cited_chunks
@@ -64,7 +65,7 @@ def get_evidence(
             title=chunk.title,
             page=chunk.page,
             section=chunk.section,
-            text=chunk.text,
+            text=reflow_passage(chunk.text),
             kind="related",
         )
         for chunk in related_chunks

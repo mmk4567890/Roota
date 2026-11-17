@@ -214,7 +214,7 @@ def test_unknown_and_tbd_doc_return_empty(fake_store: ManualStore) -> None:
     )
 
 
-def test_evidence_text_is_verbatim(
+def test_evidence_text_is_reflowed_from_stored_page(
     fake_store: ManualStore, sample_pdf: Path
 ) -> None:
     ingest_pdf(sample_pdf, doc_id="demo_manual", title="Demo Manual", store=fake_store)
@@ -226,9 +226,11 @@ def test_evidence_text_is_verbatim(
     )
     cited = [item for item in evidence if item.kind == "cited"]
     assert cited
+    collapsed_page = " ".join(pages[0].text.split())
     for item in cited:
         if item.text:
-            assert item.text in pages[0].text
+            # Soft line breaks may be joined, but content still comes from the page.
+            assert " ".join(item.text.split()) in collapsed_page
 
 
 def test_docs_list_and_search_api(
