@@ -34,6 +34,7 @@ class FaultInfo(BaseModel):
     fault_codes: list[str]
     description: str
     fields: list[FieldInfo]
+    check_count: int
 
 
 @router.get("/faults", response_model=list[FaultInfo])
@@ -61,6 +62,7 @@ def list_faults(
                 )
                 for field in graph.fields
             ],
+            check_count=len(graph.checks),
         )
         for graph in graphs.values()
     ]
