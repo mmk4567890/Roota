@@ -295,6 +295,37 @@ def test_airflow_unclear_and_dusty_heatsink_confirms_airflow_cause(
     assert state.next_action.cause_id == "blocked_airflow"
 
 
+def test_ambient_unclear_and_load_over_confirms(acs580: FaultGraph) -> None:
+    state = evaluate(
+        acs580,
+        {
+            **COOLING_OK,
+            "ambient_above_derating_temp": "unclear",
+            "load_within_derated_capacity": "no",
+        },
+    )
+    by_id = {cause.cause_id: cause.status for cause in state.causes}
+    assert by_id["load_above_derated_capacity"] == "confirmed"
+    assert state.next_action.type == "root_cause"
+    assert state.next_action.cause_id == "load_above_derated_capacity"
+
+
+def test_ambient_unclear_and_load_within_is_inconclusive(acs580: FaultGraph) -> None:
+    state = evaluate(
+        acs580,
+        {
+            **COOLING_OK,
+            "ambient_above_derating_temp": "unclear",
+            "load_within_derated_capacity": "yes",
+        },
+    )
+    by_id = {cause.cause_id: cause.status for cause in state.causes}
+    assert by_id["load_above_derated_capacity"] == "inconclusive"
+    assert state.next_action.type == "check"
+    assert state.next_action.check is not None
+    assert state.next_action.check.id == "check_motor_vs_drive_power"
+
+
 def test_airflow_unclear_and_clean_heatsink_is_inconclusive(acs580: FaultGraph) -> None:
     from app.engine.engine import UNCLEAR_REASON
 
@@ -487,3 +518,15 @@ def test_api_ambient_between_derating_limits_is_unclear_with_message(
     assert load["status"] == "open"
     assert body["state"]["next_action"]["type"] == "check"
     assert body["state"]["next_action"]["check"]["id"] == "check_derated_load"
+
+    over = client.post(
+        f"/sessions/{session_id}/facts",
+        json={
+            "facts": {"load_within_derated_capacity": "no"},
+            "check_id": "check_derated_load",
+        },
+    )
+    assert over.status_code == 200, over.text
+    over_body = over.json()
+    assert over_body["state"]["next_action"]["type"] == "root_cause"
+    assert over_body["state"]["next_action"]["cause_id"] == "load_above_derated_capacity"

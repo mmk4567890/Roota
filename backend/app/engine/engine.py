@@ -172,12 +172,20 @@ def evaluate_condition(
 def _evaluate_leaf(
     condition: FieldCondition, facts: dict[str, Any]
 ) -> tuple[Truth, list[str]]:
-    if not _is_known(facts, condition.field):
+    if condition.field not in facts:
         return Truth.UNKNOWN, []
 
     actual = facts[condition.field]
     expected = condition.value
     op = condition.op
+
+    # "unclear" is a reported answer, not a missing fact. It never equals a
+    # concrete confirm/rule-out value (eq/in/comparisons → FALSE) and is not
+    # equal under ne → TRUE, so sibling fields can still decide the cause.
+    if actual == UNCLEAR:
+        if op == "ne":
+            return Truth.TRUE, [condition.field]
+        return Truth.FALSE, []
 
     if op == "eq":
         matched = actual == expected
@@ -433,13 +441,6 @@ def _is_promoted(cause: Cause, facts: dict[str, Any]) -> bool:
         return False
     truth, _ = evaluate_condition(cause.promote_when, facts)
     return truth is Truth.TRUE
-
-
-def _is_known(facts: dict[str, Any], field_name: str) -> bool:
-    """True when the field has a decisive value (not missing, not unclear)."""
-    if field_name not in facts:
-        return False
-    return facts[field_name] != UNCLEAR
 
 
 def _is_answered(facts: dict[str, Any], field_name: str) -> bool:

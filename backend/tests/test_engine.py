@@ -318,6 +318,19 @@ def test_three_valued_any_with_unknown() -> None:
     assert because == ["b"]
 
 
+def test_unclear_value_fails_eq_and_passes_ne() -> None:
+    eq_yes = FieldCondition(field="a", op="eq", value="yes")
+    ne_no = FieldCondition(field="a", op="ne", value="no")
+
+    truth, because = evaluate_condition(eq_yes, {"a": UNCLEAR})
+    assert truth is Truth.FALSE
+    assert because == []
+
+    truth, because = evaluate_condition(ne_no, {"a": UNCLEAR})
+    assert truth is Truth.TRUE
+    assert because == ["a"]
+
+
 def test_threshold_load_exactly_90(overtemperature: FaultGraph) -> None:
     state = evaluate(overtemperature, {"load_percent": 90})
 

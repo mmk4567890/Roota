@@ -306,25 +306,36 @@
             "value": "no"
           },
           {
-            "field": "load_within_derated_capacity",
-            "op": "eq",
-            "value": "yes"
+            "all": [
+              {
+                "field": "ambient_above_derating_temp",
+                "op": "eq",
+                "value": "yes"
+              },
+              {
+                "field": "load_within_derated_capacity",
+                "op": "eq",
+                "value": "yes"
+              }
+            ]
           }
-        ]
+        ],
+        "_todo": "TODO(roota): confirm ruled-out when ambient is unclear but load is within derated capacity — currently inconclusive so later checks continue"
       },
       "confirmed_when": {
         "all": [
           {
-            "field": "ambient_above_derating_temp",
-            "op": "eq",
-            "value": "yes"
-          },
-          {
             "field": "load_within_derated_capacity",
             "op": "eq",
             "value": "no"
+          },
+          {
+            "field": "ambient_above_derating_temp",
+            "op": "ne",
+            "value": "no"
           }
-        ]
+        ],
+        "_todo": "TODO(roota): confirm that load over derated capacity confirms this cause when ambient is unclear (not known to be below derating)"
       },
       "promote_when": null,
       "corrective_action": "At this ambient temperature the load current must not exceed the drive's derated load capacity. Bring the load current within that capacity, using the derating figures in the Hardware manual, chapter Technical data, section Derating.",
