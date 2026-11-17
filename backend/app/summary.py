@@ -48,6 +48,8 @@ class CitationUsed(BaseModel):
     section: str
     page: int | None
     used_for: str
+    # Verbatim manual passage when the doc is ingested; None when unavailable.
+    passage: str | None = None
 
 
 class SessionSummary(BaseModel):
@@ -177,6 +179,10 @@ def render_markdown(summary: SessionSummary) -> str:
             lines.append(
                 f"- `{cite.doc_id}` §{cite.section}{page} — {cite.used_for}"
             )
+            if cite.passage:
+                lines.append("")
+                lines.append(f"  > {cite.passage}")
+                lines.append("")
     lines.append("")
     return "\n".join(lines)
 
@@ -271,3 +277,15 @@ def _closed_at(events: list[Event]) -> datetime | None:
 def _format_source(source: Source) -> str:
     page = f", p. {source.page}" if source.page is not None else ""
     return f"Source: `{source.doc_id}` §{source.section}{page}"
+
+
+def with_citation_passages(
+    summary: SessionSummary,
+    passages: dict[tuple[str, int | None], str],
+) -> SessionSummary:
+    """Attach verbatim passages keyed by (doc_id, page). Missing keys stay None."""
+    enriched = [
+        cite.model_copy(update={"passage": passages.get((cite.doc_id, cite.page))})
+        for cite in summary.citations
+    ]
+    return summary.model_copy(update={"citations": enriched})

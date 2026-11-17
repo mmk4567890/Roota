@@ -14,7 +14,9 @@ function App() {
 
   return (
     <div className="min-h-screen">
-      <Header />
+      <div className="no-print">
+        <Header />
+      </div>
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
         {session && fault ? (
           <SessionScreen

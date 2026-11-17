@@ -10,3 +10,29 @@ body {
   background-color: #f7f8f9;
   -webkit-font-smoothing: antialiased;
 }
+
+@media print {
+  body {
+    background: white;
+    color: black;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  #session-summary,
+  .session-summary {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+
+  .summary-print-body {
+    break-inside: avoid;
+  }
+}

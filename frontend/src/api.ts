@@ -173,6 +173,7 @@ export interface CitationUsed {
   section: string;
   page: number | null;
   used_for: string;
+  passage: string | null;
 }
 
 export interface SessionSummary {

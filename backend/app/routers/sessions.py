@@ -20,7 +20,12 @@ from app.models import (
     SessionView,
     UndoRequest,
 )
-from app.summary import SessionSummary, build_summary, render_markdown
+from app.summary import (
+    SessionSummary,
+    build_summary,
+    render_markdown,
+    with_citation_passages,
+)
 from app.parser.base import ObservationParser, ParseError, ParseResult
 from app.parser.validate import validate_parse
 from app.repository import (
@@ -254,7 +259,6 @@ def get_session_summary(
     store: ManualStore = Depends(get_manual_store),
 ) -> SessionSummary | PlainTextResponse:
     """Structured session record built only from the event log and engine."""
-    del store  # Summary does not attach evidence passages.
     record = _require_session(session_id, repository)
     graph = _graph_for_session(record, graphs)
     events = repository.list_events(session_id)
@@ -277,6 +281,9 @@ def get_session_summary(
         graph=graph,
         events=events,
         state=state,
+    )
+    summary = with_citation_passages(
+        summary, _citation_passages(summary, graph, store)
     )
     if format == "markdown":
         return PlainTextResponse(
@@ -406,6 +413,47 @@ def _safe_evidence_error(error: BaseException) -> str:
     if any(token in lowered for token in ("onnx", "embedding", "tokenizer")):
         return f"{name}: embedding model not available"
     return f"{name}: retrieval failed"
+
+
+def _citation_passages(
+    summary: SessionSummary,
+    graph: FaultGraph,
+    store: ManualStore,
+) -> dict[tuple[str, int | None], str]:
+    """Best-effort verbatim passage per (doc_id, page) for summary citations."""
+    check_by_id = {check.id: check for check in graph.checks}
+    cause_by_id = {cause.id: cause for cause in graph.causes}
+    passages: dict[tuple[str, int | None], str] = {}
+
+    for cite in summary.citations:
+        key = (cite.doc_id, cite.page)
+        if key in passages:
+            continue
+
+        query = graph.description
+        source = None
+        if cite.used_for.startswith("check:"):
+            check = check_by_id.get(cite.used_for.removeprefix("check:"))
+            if check is not None:
+                query = check.instruction
+                source = check.source
+        elif cite.used_for.startswith("cause:"):
+            cause = cause_by_id.get(cite.used_for.removeprefix("cause:"))
+            if cause is not None:
+                query = cause.corrective_action
+                source = cause.action_source
+        if source is None:
+            continue
+
+        try:
+            evidence = get_evidence(source, query, store=store)
+        except Exception:
+            logger.exception("Summary citation passage retrieval failed")
+            continue
+        cited = next((item for item in evidence if item.kind == "cited"), None)
+        if cited is not None and cited.text.strip():
+            passages[key] = cited.text
+    return passages
 
 
 def _require_session(

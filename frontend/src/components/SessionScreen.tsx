@@ -59,6 +59,9 @@ export function SessionScreen({
   const action = session.state.next_action;
   const checkId =
     action.type === "check" && action.check ? action.check.id : null;
+  const showSummary =
+    closed || action.type === "root_cause" || action.type === "escalate";
+  const summaryOutcomeKey = `${session.status}:${action.type}:${action.cause_id ?? ""}`;
 
   function captureError(err: unknown): void {
     setError(
@@ -144,7 +147,7 @@ export function SessionScreen({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="no-print flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-ink-900">
             {fault.display_name}
@@ -180,11 +183,13 @@ export function SessionScreen({
       </div>
 
       {error ? (
-        <ErrorBanner message={error} onDismiss={() => setError(null)} />
+        <div className="no-print">
+          <ErrorBanner message={error} onDismiss={() => setError(null)} />
+        </div>
       ) : null}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="space-y-4">
+        <div className="no-print space-y-4">
           <NextActionCard action={action} causes={session.state.causes} />
           <EvidencePanel
             evidence={action.evidence}
@@ -226,15 +231,23 @@ export function SessionScreen({
         </div>
 
         <div className="space-y-4">
-          <CausesPanel causes={session.state.causes} />
-          <FactsTable facts={session.state.facts} />
-          <SummaryPanel sessionId={session.id} />
-          <Timeline
-            events={session.events}
-            disabled={closed || anyBusy}
-            undoingEventId={undoBusyId}
-            onUndo={(id) => void handleUndo(id)}
+          <div className="no-print space-y-4">
+            <CausesPanel causes={session.state.causes} />
+            <FactsTable facts={session.state.facts} />
+          </div>
+          <SummaryPanel
+            sessionId={session.id}
+            autoOpen={showSummary}
+            outcomeKey={summaryOutcomeKey}
           />
+          <div className="no-print">
+            <Timeline
+              events={session.events}
+              disabled={closed || anyBusy}
+              undoingEventId={undoBusyId}
+              onUndo={(id) => void handleUndo(id)}
+            />
+          </div>
         </div>
       </div>
     </div>

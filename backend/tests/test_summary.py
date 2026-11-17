@@ -134,6 +134,28 @@ def test_summary_form_vs_observation_and_markdown(client: TestClient) -> None:
     assert "fan_status" in md.text
 
 
+def test_summary_citations_include_passage_field(client: TestClient) -> None:
+    created = client.post(
+        "/sessions",
+        json={
+            "fault_id": "acs580_overtemperature",
+            "equipment_label": "Line 4",
+        },
+    )
+    session_id = created.json()["id"]
+    client.post(
+        f"/sessions/{session_id}/facts",
+        json={"facts": {"fan_status": "not_running"}},
+    )
+    body = client.get(f"/sessions/{session_id}/summary").json()
+    assert body["root_cause"] is not None
+    assert body["citations"]
+    for cite in body["citations"]:
+        assert "passage" in cite
+        # Without an ingested manual the passage stays null; the key must exist.
+        assert cite["passage"] is None or isinstance(cite["passage"], str)
+
+
 def test_summary_escalation_names_inconclusive_fan(client: TestClient) -> None:
     created = client.post(
         "/sessions",
