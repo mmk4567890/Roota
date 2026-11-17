@@ -1,20 +1,126 @@
+@import "@fontsource/ibm-plex-sans/300.css";
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-body {
-  margin: 0;
-  min-height: 100vh;
-  font-family: "Segoe UI", "Helvetica Neue", Helvetica, sans-serif;
-  color: #22262e;
-  background-color: #f7f8f9;
-  -webkit-font-smoothing: antialiased;
+@layer base {
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    font-size: 14px;
+    color: #ededed;
+    background-color: #08090b;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid #ffffff;
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .hud-glow {
+    background:
+      radial-gradient(
+        ellipse 70% 50% at 50% 28%,
+        rgba(22, 24, 28, 0.95) 0%,
+        rgba(8, 9, 11, 0) 70%
+      ),
+      #08090b;
+  }
+
+  .hud-hairline {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .hud-hairline-hover:hover {
+    border-color: rgba(255, 255, 255, 0.16);
+  }
+
+  .hud-button {
+    @apply inline-flex items-center gap-2 rounded-[4px] border border-white/10 bg-transparent px-3 py-2 text-14 text-hud-text transition-colors duration-hud;
+  }
+
+  .hud-button:hover:not(:disabled) {
+    border-color: rgba(255, 255, 255, 0.16);
+  }
+
+  .hud-button:disabled {
+    @apply cursor-not-allowed opacity-40;
+  }
+
+  .hud-chip {
+    @apply rounded-[4px] border border-white/10 bg-transparent px-3 py-1.5 text-14 text-hud-text transition-colors duration-hud;
+  }
+
+  .hud-chip[aria-pressed="true"],
+  .hud-chip-selected {
+    @apply border-white bg-white text-hud-bg;
+  }
+
+  .hud-mono-tag {
+    @apply font-mono text-12 uppercase tracking-label text-hud-muted;
+  }
+
+  .hud-display {
+    @apply font-display font-light tracking-display text-hud-text;
+  }
+
+  .corner-frame {
+    position: relative;
+  }
+
+  .corner-frame::before,
+  .corner-frame::after,
+  .corner-frame > .corner-br::before,
+  .corner-frame > .corner-br::after {
+    content: "";
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    pointer-events: none;
+  }
+
+  .corner-frame::before {
+    top: 0;
+    left: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.35);
+    border-left: 1px solid rgba(255, 255, 255, 0.35);
+  }
+
+  .corner-frame::after {
+    top: 0;
+    right: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.35);
+    border-right: 1px solid rgba(255, 255, 255, 0.35);
+  }
+
+  .corner-frame > .corner-br::before {
+    bottom: 0;
+    left: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.35);
+    border-left: 1px solid rgba(255, 255, 255, 0.35);
+  }
+
+  .corner-frame > .corner-br::after {
+    bottom: 0;
+    right: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.35);
+    border-right: 1px solid rgba(255, 255, 255, 0.35);
+  }
 }
 
 @media print {
   body {
-    background: white;
-    color: black;
+    background: white !important;
+    color: black !important;
   }
 
   .no-print {
@@ -25,11 +131,13 @@ body {
     display: block !important;
   }
 
-  #session-summary,
-  .session-summary {
+  #session-report,
+  .session-report {
     border: none !important;
     box-shadow: none !important;
     padding: 0 !important;
+    background: white !important;
+    color: black !important;
   }
 
   .summary-print-body {

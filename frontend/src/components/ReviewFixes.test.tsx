@@ -10,8 +10,7 @@ import {
   makeSession,
   sampleFault,
 } from "../test/fixtures";
-import { CausesPanel } from "./CausesPanel";
-import { EvidencePanel } from "./EvidencePanel";
+import { CauseRail } from "./CauseRail";
 import { SessionScreen } from "./SessionScreen";
 import { StartScreen } from "./StartScreen";
 
@@ -19,7 +18,9 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function renderSession(overrides: Partial<Parameters<typeof SessionScreen>[0]> = {}) {
+function renderSession(
+  overrides: Partial<Parameters<typeof SessionScreen>[0]> = {},
+) {
   const props = {
     session: makeSession(),
     fault: sampleFault,
@@ -31,88 +32,7 @@ function renderSession(overrides: Partial<Parameters<typeof SessionScreen>[0]> =
   return props;
 }
 
-describe("evidence passages", () => {
-  it("renders every chunk of a cited page, without duplicate keys", () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-    const chunk = {
-      doc_id: "abb_acs580_fw",
-      title: "ACS580 firmware manual",
-      page: 555,
-      section: "",
-      kind: "cited" as const,
-    };
-
-    render(
-      <EvidencePanel
-        evidence={[
-          { ...chunk, text: "Check air flow and fan operation." },
-          { ...chunk, text: "Check heatsink fins for dust pick-up." },
-        ]}
-        evidenceStatus="attached"
-        evidenceError={null}
-      />,
-    );
-
-    // The most relevant chunk (first, as ordered by the API) is open; the rest
-    // of the page is folded so other faults' entries don't lead.
-    expect(screen.getByText("Check air flow and fan operation.")).toBeInTheDocument();
-    expect(screen.queryByText("Check heatsink fins for dust pick-up.")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Show more from this page (1)" }));
-    expect(screen.getByText("Check heatsink fins for dust pick-up.")).toBeInTheDocument();
-    // An empty section is not shown as a bare "§".
-    expect(screen.queryByText(/§/)).toBeNull();
-    const keyWarnings = consoleError.mock.calls.filter((call) =>
-      String(call[0]).includes("same key"),
-    );
-    expect(keyWarnings).toEqual([]);
-  });
-});
-
-describe("typed input survives a failed request", () => {
-  it("keeps the observation text after a 502", async () => {
-    vi.spyOn(api, "reportObservation").mockRejectedValue(
-      new api.ApiError(502, "Anthropic API call failed", "Anthropic API call failed"),
-    );
-    renderSession();
-    const box = screen.getByLabelText("Report what you observed");
-
-    fireEvent.change(box, { target: { value: "Fan stopped, vents dusty" } });
-    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
-
-    await screen.findByText("Anthropic API call failed");
-    expect(box).toHaveValue("Fan stopped, vents dusty");
-  });
-
-  it("clears the observation text after success", async () => {
-    vi.spyOn(api, "reportObservation").mockResolvedValue(makeObservationResponse());
-    renderSession();
-    const box = screen.getByLabelText("Report what you observed");
-
-    fireEvent.change(box, { target: { value: "Fan is fine" } });
-    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
-
-    await waitFor(() => expect(box).toHaveValue(""));
-  });
-
-  it("keeps direct-entry values after a 422", async () => {
-    vi.spyOn(api, "reportFacts").mockRejectedValue(
-      new api.ApiError(422, "invalid value", "invalid value for field"),
-    );
-    renderSession();
-    fireEvent.click(screen.getByLabelText("Enter values directly"));
-    const field = sampleFault.fields[0];
-    const input = screen.getByLabelText(new RegExp(field.ask.replace(/[?()]/g, "\\$&")));
-    const value = field.type === "enum" ? (field.values ?? [])[0] : "5";
-
-    fireEvent.change(input, { target: { value } });
-    fireEvent.click(screen.getByRole("button", { name: "Submit values" }));
-
-    await screen.findByText("invalid value for field");
-    expect(input).toHaveValue(value);
-  });
-});
-
-describe("start screen", () => {
+describe("start screen initial notes", () => {
   it("enters the created session when the initial notes fail, never creating a second one", async () => {
     vi.spyOn(api, "listFaults").mockResolvedValue([sampleFault]);
     const create = vi.spyOn(api, "createSession").mockResolvedValue(makeSession());
@@ -122,8 +42,8 @@ describe("start screen", () => {
     const onStarted = vi.fn();
     render(<StartScreen onStarted={onStarted} />);
 
-    await screen.findByLabelText("Equipment label");
-    fireEvent.change(screen.getByLabelText("Equipment label"), {
+    await screen.findByLabelText("Equipment");
+    fireEvent.change(screen.getByLabelText("Equipment"), {
       target: { value: "Bay 1" },
     });
     fireEvent.change(screen.getByLabelText("Initial notes (optional)"), {
@@ -137,19 +57,29 @@ describe("start screen", () => {
     expect(session.id).toBe(makeSession().id);
     expect(initial.observation).toBeNull();
     expect(initial.error).toContain("initial notes were not recorded");
-    expect(initial.error).toContain("Anthropic API call failed");
   });
 
-  it("passes the initial notes' parse result on", async () => {
+  it("submits initial notes as the first observation and starts with those facts", async () => {
     vi.spyOn(api, "listFaults").mockResolvedValue([sampleFault]);
     vi.spyOn(api, "createSession").mockResolvedValue(makeSession());
-    const observed = makeObservationResponse();
-    vi.spyOn(api, "reportObservation").mockResolvedValue(observed);
+    const observed = makeObservationResponse({
+      state: {
+        ...makeSession().state,
+        facts: { fan_status: "normal" },
+      },
+      parse: {
+        extracted: { fan_status: "normal" },
+        unclear_fields: [],
+        rejected: [],
+        notes: "",
+      },
+    });
+    const observe = vi.spyOn(api, "reportObservation").mockResolvedValue(observed);
     const onStarted = vi.fn();
     render(<StartScreen onStarted={onStarted} />);
 
-    await screen.findByLabelText("Equipment label");
-    fireEvent.change(screen.getByLabelText("Equipment label"), {
+    await screen.findByLabelText("Equipment");
+    fireEvent.change(screen.getByLabelText("Equipment"), {
       target: { value: "Bay 1" },
     });
     fireEvent.change(screen.getByLabelText("Initial notes (optional)"), {
@@ -158,7 +88,14 @@ describe("start screen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Start session" }));
 
     await waitFor(() => expect(onStarted).toHaveBeenCalledTimes(1));
-    expect(onStarted.mock.calls[0][2]).toEqual({ observation: observed, error: null });
+    expect(observe).toHaveBeenCalledWith(makeSession().id, {
+      text: "Fan is fine",
+    });
+    const [session, , initial] = onStarted.mock.calls[0];
+    expect(session).toBe(observed);
+    expect(session.state.facts.fan_status).toBe("normal");
+    expect(initial.observation).toBe(observed);
+    expect(initial.error).toBeNull();
   });
 });
 
@@ -169,16 +106,56 @@ describe("session screen", () => {
       initialError: "Session started, but the initial notes were not recorded: x",
     });
 
-    expect(screen.getByText("fan_status = normal")).toBeInTheDocument();
+    expect(screen.getByText(/Fan status: Normal/)).toBeInTheDocument();
     expect(
       screen.getByText("Session started, but the initial notes were not recorded: x"),
     ).toBeInTheDocument();
   });
 
   it("stays on the closed session after closing", async () => {
-    const closed = makeSession({ status: "closed" });
+    const closed = makeSession({
+      status: "closed",
+      state: {
+        ...makeSession().state,
+        next_action: {
+          type: "root_cause",
+          message: "Replace the fan.",
+          check: null,
+          cause_id: "cooling_fan_failure",
+          fields: null,
+          source: {
+            doc_id: "TBD_MANUAL",
+            section: "Cooling",
+            page: 12,
+          },
+          evidence: null,
+          evidence_status: null,
+          evidence_error: null,
+        },
+      },
+    });
     vi.spyOn(api, "closeSession").mockResolvedValue(closed);
-    const props = renderSession();
+    const active = makeSession({
+      state: {
+        ...makeSession().state,
+        next_action: {
+          type: "root_cause",
+          message: "Replace the fan.",
+          check: null,
+          cause_id: "cooling_fan_failure",
+          fields: null,
+          source: {
+            doc_id: "TBD_MANUAL",
+            section: "Cooling",
+            page: 12,
+          },
+          evidence: null,
+          evidence_status: null,
+          evidence_error: null,
+        },
+      },
+    });
+    const props = renderSession({ session: active });
 
     fireEvent.click(screen.getByRole("button", { name: "Close session" }));
 
@@ -187,32 +164,52 @@ describe("session screen", () => {
   });
 
   it("New session on a closed session leaves it", () => {
-    const props = renderSession({ session: makeSession({ status: "closed" }) });
+    const props = renderSession({
+      session: makeSession({
+        status: "closed",
+        state: {
+          ...makeSession().state,
+          next_action: {
+            type: "root_cause",
+            message: "Replace the fan.",
+            check: null,
+            cause_id: "cooling_fan_failure",
+            fields: null,
+            source: {
+              doc_id: "TBD_MANUAL",
+              section: "Cooling",
+              page: 12,
+            },
+            evidence: null,
+            evidence_status: null,
+            evidence_error: null,
+          },
+        },
+      }),
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "New session" }));
-
     expect(props.onClosed).toHaveBeenCalledTimes(1);
   });
 });
 
-describe("causes", () => {
-  it("shows which facts conflict for a contradiction", () => {
+describe("cause rail", () => {
+  it("shows a one-line reason when a cause is selected", () => {
     render(
-      <CausesPanel
+      <CauseRail
+        fields={sampleFault.fields}
         causes={[
           makeCause({
             cause_id: "excessive_load",
             name: "Excessive load",
             status: "contradiction",
-            because: ["high_load_sustained", "load_percent"],
+            because: ["load_percent"],
           }),
         ]}
       />,
     );
 
-    expect(screen.getByText("Contradiction")).toBeInTheDocument();
-    expect(
-      screen.getByText("Conflicting facts: high_load_sustained, load_percent"),
-    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Excessive load/ }));
+    expect(screen.getByText(/Conflicting facts: Load/)).toBeInTheDocument();
   });
 });

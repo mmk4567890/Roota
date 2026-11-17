@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { Play } from "lucide-react";
 import {
   ApiError,
   createSession,
@@ -79,9 +80,8 @@ export function StartScreen({ onStarted }: StartScreenProps) {
       setSubmitting(false);
       return;
     }
-    // The session exists from here on. If the initial notes fail, still enter
-    // it and show the error there: staying here would make "Start" create a
-    // second session and orphan this one.
+    // Session exists from here. If initial notes fail, still enter it so Start
+    // does not create a second orphaned session.
     const notes = initialNotes.trim();
     let observation: ObservationResponse | null = null;
     let notesError: string | null = null;
@@ -93,7 +93,10 @@ export function StartScreen({ onStarted }: StartScreenProps) {
       }
     }
     setSubmitting(false);
-    onStarted(observation ?? session, selected, { observation, error: notesError });
+    onStarted(observation ?? session, selected, {
+      observation,
+      error: notesError,
+    });
   }
 
   if (loadError) {
@@ -102,16 +105,14 @@ export function StartScreen({ onStarted }: StartScreenProps) {
 
   if (faults === null) {
     return (
-      <p className="text-sm text-ink-500" role="status">
+      <p className="text-14 text-hud-muted" role="status">
         Loading faults…
       </p>
     );
   }
 
   if (faults.length === 0) {
-    return (
-      <ErrorBanner message="No fault graphs are loaded on the server." />
-    );
+    return <ErrorBanner message="No fault graphs are loaded on the server." />;
   }
 
   const selected = faults.find((item) => item.fault_id === faultId);
@@ -119,14 +120,14 @@ export function StartScreen({ onStarted }: StartScreenProps) {
   return (
     <section
       aria-labelledby="start-heading"
-      className="mx-auto max-w-xl rounded-md border border-ink-200 bg-white px-4 py-6 sm:px-6"
+      className="mx-auto max-w-lg border border-white/10 bg-hud-surface/80 px-5 py-8 sm:px-8"
     >
-      <h2 id="start-heading" className="text-lg font-semibold text-ink-900">
-        Start a diagnostic session
+      <h2 id="start-heading" className="hud-display text-20">
+        Start session
       </h2>
-      <p className="mt-1 text-sm text-ink-500">
-        Choose the fault, name the equipment, and optionally add notes from the
-        keypad or first look.
+      <p className="mt-2 text-14 text-hud-muted">
+        Choose the problem, name the equipment, and optionally add notes from
+        the keypad or first look.
       </p>
 
       {submitError ? (
@@ -138,10 +139,10 @@ export function StartScreen({ onStarted }: StartScreenProps) {
         </div>
       ) : null}
 
-      <form className="mt-5 space-y-4" onSubmit={(e) => void handleSubmit(e)}>
+      <form className="mt-6 space-y-5" onSubmit={(e) => void handleSubmit(e)}>
         <div>
-          <label htmlFor="fault-id" className="block text-sm font-medium text-ink-800">
-            Fault
+          <label htmlFor="fault-id" className="hud-mono-tag">
+            Problem
           </label>
           <select
             id="fault-id"
@@ -150,26 +151,25 @@ export function StartScreen({ onStarted }: StartScreenProps) {
             value={faultId}
             disabled={submitting}
             onChange={(event) => setFaultId(event.target.value)}
-            className="mt-1 w-full rounded border border-ink-300 px-3 py-2 text-sm"
+            className="mt-2 w-full rounded-[4px] border border-white/10 bg-transparent px-3 py-2 text-14 text-hud-text"
           >
-            <option value="">— select a fault —</option>
+            <option value="">— select —</option>
             {faults.map((fault) => (
               <option key={fault.fault_id} value={fault.fault_id}>
-                {fault.display_name} ({fault.fault_codes.join(", ")})
+                {problemLabel(fault)}
               </option>
             ))}
           </select>
           {selected ? (
-            <p className="mt-1 text-xs text-ink-500">{selected.description}</p>
+            <p className="mt-2 font-mono text-12 uppercase tracking-label text-hud-muted">
+              {selected.fault_codes.join(" · ")}
+            </p>
           ) : null}
         </div>
 
         <div>
-          <label
-            htmlFor="equipment-label"
-            className="block text-sm font-medium text-ink-800"
-          >
-            Equipment label
+          <label htmlFor="equipment-label" className="hud-mono-tag">
+            Equipment
           </label>
           <input
             id="equipment-label"
@@ -179,16 +179,13 @@ export function StartScreen({ onStarted }: StartScreenProps) {
             value={equipmentLabel}
             disabled={submitting}
             onChange={(event) => setEquipmentLabel(event.target.value)}
-            className="mt-1 w-full rounded border border-ink-300 px-3 py-2 text-sm"
+            className="mt-2 w-full rounded-[4px] border border-white/10 bg-transparent px-3 py-2 text-14 text-hud-text"
             placeholder="e.g. Line 3 conveyor drive"
           />
         </div>
 
         <div>
-          <label
-            htmlFor="initial-notes"
-            className="block text-sm font-medium text-ink-800"
-          >
+          <label htmlFor="initial-notes" className="hud-mono-tag">
             Initial notes (optional)
           </label>
           <textarea
@@ -198,7 +195,7 @@ export function StartScreen({ onStarted }: StartScreenProps) {
             value={initialNotes}
             disabled={submitting}
             onChange={(event) => setInitialNotes(event.target.value)}
-            className="mt-1 w-full rounded border border-ink-300 px-3 py-2 text-sm"
+            className="mt-2 w-full rounded-[4px] border border-white/10 bg-transparent px-3 py-2 text-14 text-hud-text"
             placeholder="Sent as the first observation after the session starts"
           />
         </div>
@@ -207,13 +204,22 @@ export function StartScreen({ onStarted }: StartScreenProps) {
           type="submit"
           name="start-session"
           disabled={submitting || !faultId || !equipmentLabel.trim()}
-          className="w-full rounded bg-accent px-3 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+          className="hud-button"
         >
+          <Play className="h-4 w-4" aria-hidden />
           {submitting ? "Starting…" : "Start session"}
         </button>
       </form>
     </section>
   );
+}
+
+function problemLabel(fault: FaultInfo): string {
+  // Problem-first: short readable name with equipment brand when present.
+  if (fault.fault_id === "acs580_overtemperature") {
+    return "Overtemperature — ABB ACS580";
+  }
+  return fault.display_name;
 }
 
 function errorText(error: unknown, fallback: string): string {

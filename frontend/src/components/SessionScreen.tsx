@@ -10,25 +10,20 @@ import {
   type ParseResult,
   type SessionView,
 } from "../api";
-import { CausesPanel } from "./CausesPanel";
+import { CauseRail } from "./CauseRail";
+import { CurrentCheck } from "./CurrentCheck";
 import { ErrorBanner } from "./ErrorBanner";
-import { EvidencePanel } from "./EvidencePanel";
-import { FactsForm } from "./FactsForm";
-import { FactsTable } from "./FactsTable";
-import { NextActionCard } from "./NextActionCard";
-import { ObservationForm } from "./ObservationForm";
-import { SummaryPanel } from "./SummaryPanel";
-import { Timeline } from "./Timeline";
+import { OutcomeView } from "./OutcomeView";
+import { ReportView } from "./ReportView";
+import { SessionLogDrawer } from "./SessionLogDrawer";
+import { TopBar } from "./TopBar";
 
 interface SessionScreenProps {
   session: SessionView;
   fault: FaultInfo;
   onSessionChange: (session: SessionView) => void;
-  /** Leave this session for the start screen. */
   onClosed: () => void;
-  /** Result of the initial-notes observation sent by the start screen. */
   initialObservation?: ObservationResponse | null;
-  /** Error from that observation; the session itself was created. */
   initialError?: string | null;
 }
 
@@ -45,13 +40,14 @@ export function SessionScreen({
   const [factsBusy, setFactsBusy] = useState(false);
   const [undoBusyId, setUndoBusyId] = useState<number | null>(null);
   const [closeBusy, setCloseBusy] = useState(false);
-  const [directEntry, setDirectEntry] = useState(false);
   const [lastParse, setLastParse] = useState<ParseResult | null>(
     initialObservation?.parse ?? null,
   );
   const [lastMessage, setLastMessage] = useState<string | null>(
     initialObservation?.message ?? null,
   );
+  const [logOpen, setLogOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
   const closed = session.status === "closed";
   const anyBusy =
@@ -59,9 +55,17 @@ export function SessionScreen({
   const action = session.state.next_action;
   const checkId =
     action.type === "check" && action.check ? action.check.id : null;
-  const showSummary =
-    closed || action.type === "root_cause" || action.type === "escalate";
-  const summaryOutcomeKey = `${session.status}:${action.type}:${action.cause_id ?? ""}`;
+  const isOutcome =
+    action.type === "root_cause" || action.type === "escalate" || closed;
+  const canViewReport = isOutcome;
+
+  const checkTotal = Math.max(fault.check_count, 1);
+  const onActiveCheck = Boolean(checkId) || action.type === "need_info";
+  const checkIndex =
+    Math.min(
+      session.state.checks_completed.length + (onActiveCheck ? 1 : 0),
+      checkTotal,
+    ) || 1;
 
   function captureError(err: unknown): void {
     setError(
@@ -93,17 +97,24 @@ export function SessionScreen({
     }
   }
 
-  async function handleFacts(
-    facts: Record<string, unknown>,
-    submittedCheckId: string | null,
+  async function handleChip(
+    fieldName: string,
+    value: string,
   ): Promise<boolean> {
     setFactsBusy(true);
     setError(null);
     try {
       const updated = await reportFacts(session.id, {
-        facts,
-        check_id: submittedCheckId,
+        facts: { [fieldName]: value },
+        check_id: checkId,
       });
+      setLastParse({
+        extracted: { [fieldName]: value },
+        unclear_fields: value === "unclear" ? [fieldName] : [],
+        rejected: [],
+        notes: "",
+      });
+      setLastMessage(null);
       onSessionChange(updated);
       return true;
     } catch (err) {
@@ -135,8 +146,6 @@ export function SessionScreen({
     setError(null);
     try {
       const updated = await closeSession(session.id);
-      // Stay on the closed, read-only view so the final state stays visible;
-      // "New session" leaves it.
       onSessionChange(updated);
     } catch (err) {
       captureError(err);
@@ -145,111 +154,139 @@ export function SessionScreen({
     }
   }
 
+  const showCheck =
+    !closed && (action.type === "check" || action.type === "need_info");
+
   return (
-    <div className="space-y-4">
-      <div className="no-print flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-ink-900">
-            {fault.display_name}
-          </h2>
-          <p className="text-sm text-ink-500">
-            {session.equipment_label}
-            <span className="mx-2 text-ink-300">·</span>
-            Codes: {fault.fault_codes.join(", ")}
-            <span className="mx-2 text-ink-300">·</span>
-            Status: {session.status}
-          </p>
-        </div>
-        {!closed ? (
-          <button
-            type="button"
-            name="close-session"
-            disabled={anyBusy}
-            onClick={() => void handleClose()}
-            className="rounded border border-ink-300 px-3 py-2 text-sm font-medium text-ink-800 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {closeBusy ? "Closing…" : "Close session"}
-          </button>
-        ) : (
-          <button
-            type="button"
-            name="new-session"
-            onClick={onClosed}
-            className="rounded bg-accent px-3 py-2 text-sm font-medium text-white"
-          >
-            New session
-          </button>
-        )}
-      </div>
+    <>
+      <TopBar
+        fault={fault}
+        equipmentLabel={session.equipment_label}
+        status={session.status}
+        actionType={action.type}
+        showLog
+        onOpenLog={() => setLogOpen(true)}
+      />
 
       {error ? (
-        <div className="no-print">
+        <div className="no-print mx-auto max-w-content px-4 pt-4 sm:px-6">
           <ErrorBanner message={error} onDismiss={() => setError(null)} />
         </div>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="no-print space-y-4">
-          <NextActionCard action={action} causes={session.state.causes} />
-          <EvidencePanel
-            evidence={action.evidence}
-            evidenceStatus={action.evidence_status}
-            evidenceError={action.evidence_error}
+      <div className="mx-auto grid max-w-content gap-6 px-4 py-6 sm:px-6 min-[900px]:grid-cols-[220px_minmax(0,1fr)]">
+        <aside className="order-2 min-[900px]:order-1 min-[900px]:pt-2">
+          <CauseRail
+            causes={session.state.causes}
+            fields={fault.fields}
+            outcomeMode={isOutcome}
           />
-          {!closed ? (
-            <>
-              <ObservationForm
-                disabled={anyBusy && !observationBusy}
-                submitting={observationBusy}
-                lastParse={lastParse}
-                lastMessage={lastMessage}
-                onSubmit={handleObservation}
-              />
-              <div className="rounded-md border border-ink-200 bg-white px-4 py-3">
-                <label className="flex items-center gap-2 text-sm text-ink-800">
-                  <input
-                    type="checkbox"
-                    name="direct-entry-toggle"
-                    checked={directEntry}
-                    disabled={anyBusy}
-                    onChange={(event) => setDirectEntry(event.target.checked)}
-                  />
-                  Enter values directly
-                </label>
-              </div>
-              {directEntry ? (
-                <FactsForm
-                  fields={fault.fields}
-                  disabled={anyBusy && !factsBusy}
-                  submitting={factsBusy}
-                  checkId={checkId}
-                  onSubmit={handleFacts}
-                />
-              ) : null}
-            </>
+        </aside>
+
+        <div className="order-1 min-w-0 min-[900px]:order-2">
+          {showCheck && action.type === "check" && action.check ? (
+            <CurrentCheck
+              check={action.check}
+              checkIndex={Math.max(checkIndex, 1)}
+              checkTotal={checkTotal}
+              fields={fault.fields}
+              evidence={action.evidence}
+              disabled={anyBusy && !observationBusy && !factsBusy}
+              submitting={observationBusy || factsBusy}
+              lastParse={lastParse}
+              lastMessage={lastMessage}
+              onChip={handleChip}
+              onObserve={handleObservation}
+            />
+          ) : null}
+
+          {showCheck && action.type === "need_info" ? (
+            <CurrentCheck
+              check={{
+                id: action.check?.id ?? "need_info",
+                instruction: action.message,
+                reason: "Clarify the last report before continuing.",
+                collects: action.fields ?? action.check?.collects ?? [],
+                source:
+                  action.source ??
+                  action.check?.source ?? {
+                    doc_id: "TBD_MANUAL",
+                    section: "—",
+                    page: null,
+                  },
+              }}
+              checkIndex={Math.max(checkIndex, 1)}
+              checkTotal={checkTotal}
+              fields={fault.fields}
+              evidence={action.evidence}
+              disabled={anyBusy && !observationBusy && !factsBusy}
+              submitting={observationBusy || factsBusy}
+              lastParse={lastParse}
+              lastMessage={lastMessage}
+              onChip={handleChip}
+              onObserve={handleObservation}
+            />
+          ) : null}
+
+          {isOutcome &&
+          (action.type === "root_cause" || action.type === "escalate") ? (
+            <OutcomeView
+              action={action}
+              causes={session.state.causes}
+              onViewReport={() => {
+                if (canViewReport) {
+                  setReportOpen(true);
+                }
+              }}
+              onCloseSession={() => void handleClose()}
+              closeBusy={closeBusy}
+              closed={closed}
+            />
+          ) : null}
+
+          {closed &&
+          action.type !== "root_cause" &&
+          action.type !== "escalate" ? (
+            <OutcomeView
+              action={{
+                ...action,
+                type: "escalate",
+                message: "Session closed.",
+              }}
+              causes={session.state.causes}
+              onViewReport={() => setReportOpen(true)}
+              onCloseSession={() => undefined}
+              closeBusy={false}
+              closed
+            />
+          ) : null}
+
+          {closed ? (
+            <div className="no-print mt-4">
+              <button type="button" className="hud-button" onClick={onClosed}>
+                New session
+              </button>
+            </div>
           ) : null}
         </div>
-
-        <div className="space-y-4">
-          <div className="no-print space-y-4">
-            <CausesPanel causes={session.state.causes} />
-            <FactsTable facts={session.state.facts} />
-          </div>
-          <SummaryPanel
-            sessionId={session.id}
-            autoOpen={showSummary}
-            outcomeKey={summaryOutcomeKey}
-          />
-          <div className="no-print">
-            <Timeline
-              events={session.events}
-              disabled={closed || anyBusy}
-              undoingEventId={undoBusyId}
-              onUndo={(id) => void handleUndo(id)}
-            />
-          </div>
-        </div>
       </div>
-    </div>
+
+      <SessionLogDrawer
+        open={logOpen}
+        events={session.events}
+        fields={fault.fields}
+        disabled={closed || anyBusy}
+        undoingEventId={undoBusyId}
+        onClose={() => setLogOpen(false)}
+        onUndo={(id) => void handleUndo(id)}
+      />
+
+      {reportOpen && canViewReport ? (
+        <ReportView
+          sessionId={session.id}
+          onClose={() => setReportOpen(false)}
+        />
+      ) : null}
+    </>
   );
 }

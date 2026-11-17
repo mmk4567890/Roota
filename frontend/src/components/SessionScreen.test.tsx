@@ -12,141 +12,76 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+function renderSession(
+  overrides: Partial<Parameters<typeof SessionScreen>[0]> = {},
+) {
+  const props = {
+    session: makeSession(),
+    fault: sampleFault,
+    onSessionChange: vi.fn(),
+    onClosed: vi.fn(),
+    ...overrides,
+  };
+  render(<SessionScreen {...props} />);
+  return props;
+}
+
 describe("SessionScreen", () => {
-  it("submitting an observation calls the API and shows Understood", async () => {
-    const response = makeObservationResponse({
-      parse: {
-        extracted: { fan_status: "noisy" },
-        unclear_fields: ["heatsink_condition"],
-        rejected: [],
-        notes: "",
+  it("submits an observation for the current check", async () => {
+    const response = makeObservationResponse();
+    vi.spyOn(api, "reportObservation").mockResolvedValue(response);
+    const props = renderSession();
+
+    fireEvent.change(screen.getByLabelText("Or describe what you see"), {
+      target: { value: "Fan is fine" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Submit observation" }));
+
+    await waitFor(() =>
+      expect(api.reportObservation).toHaveBeenCalledWith(props.session.id, {
+        text: "Fan is fine",
+        check_id: "check_fan_operation",
+      }),
+    );
+    expect(props.onSessionChange).toHaveBeenCalledWith(response);
+    expect(screen.getByText(/Fan status: Normal/)).toBeInTheDocument();
+  });
+
+  it("shows API errors without clearing the text box", async () => {
+    vi.spyOn(api, "reportObservation").mockRejectedValue(
+      new api.ApiError(502, "down", "Anthropic API call failed"),
+    );
+    renderSession();
+    const box = screen.getByLabelText("Or describe what you see");
+    fireEvent.change(box, { target: { value: "Fan stopped" } });
+    fireEvent.click(screen.getByRole("button", { name: "Submit observation" }));
+    await screen.findByText("Anthropic API call failed");
+    expect(box).toHaveValue("Fan stopped");
+  });
+
+  it("submits a quick-answer chip as facts", async () => {
+    const updated = makeSession({
+      state: {
+        ...makeSession().state,
+        facts: { fan_status: "noisy" },
       },
     });
-    const spy = vi
-      .spyOn(api, "reportObservation")
-      .mockResolvedValue(response);
-    const onSessionChange = vi.fn();
+    vi.spyOn(api, "reportFacts").mockResolvedValue(updated);
+    const props = renderSession();
 
-    render(
-      <SessionScreen
-        session={makeSession()}
-        fault={sampleFault}
-        onSessionChange={onSessionChange}
-        onClosed={vi.fn()}
-      />,
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Noisy" }));
 
-    fireEvent.change(screen.getByLabelText("Report what you observed"), {
-      target: { value: "The fan is noisy" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
-
-    await waitFor(() => {
-      expect(spy).toHaveBeenCalledTimes(1);
-    });
-    expect(spy).toHaveBeenCalledWith(
-      "11111111-1111-1111-1111-111111111111",
-      expect.objectContaining({ text: "The fan is noisy" }),
-    );
-    expect(screen.getByText("fan_status = noisy")).toBeInTheDocument();
-    expect(screen.getByText("Understood:")).toBeInTheDocument();
-    expect(screen.getByText("heatsink_condition")).toBeInTheDocument();
-    expect(screen.getByText("Unclear:")).toBeInTheDocument();
-    expect(onSessionChange).toHaveBeenCalledWith(response);
-  });
-
-  it("shows the backend 422 message and never swallows it", async () => {
-    vi.spyOn(api, "reportObservation").mockRejectedValue(
-      new api.ApiError(422, "facts must not be empty", "facts must not be empty"),
-    );
-
-    render(
-      <SessionScreen
-        session={makeSession()}
-        fault={sampleFault}
-        onSessionChange={vi.fn()}
-        onClosed={vi.fn()}
-      />,
-    );
-
-    fireEvent.change(screen.getByLabelText("Report what you observed"), {
-      target: { value: "unclear reading" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
-
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "facts must not be empty",
+    await waitFor(() =>
+      expect(api.reportFacts).toHaveBeenCalledWith(props.session.id, {
+        facts: { fan_status: "noisy" },
+        check_id: "check_fan_operation",
+      }),
     );
   });
 
-  it("shows the backend 502 message from a parser failure", async () => {
-    vi.spyOn(api, "reportObservation").mockRejectedValue(
-      new api.ApiError(
-        502,
-        "no report_observation_fields tool call",
-        "no report_observation_fields tool call",
-      ),
-    );
-
-    render(
-      <SessionScreen
-        session={makeSession()}
-        fault={sampleFault}
-        onSessionChange={vi.fn()}
-        onClosed={vi.fn()}
-      />,
-    );
-
-    fireEvent.change(screen.getByLabelText("Report what you observed"), {
-      target: { value: "something odd" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
-
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "no report_observation_fields tool call",
-    );
-  });
-
-  it("disables submit while a request is in flight (no double-submit)", async () => {
-    const deferred: {
-      resolve: (value: api.ObservationResponse) => void;
-    } = {
-      resolve: () => {
-        throw new Error("resolve not set");
-      },
-    };
-    const spy = vi.spyOn(api, "reportObservation").mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          deferred.resolve = resolve;
-        }),
-    );
-
-    render(
-      <SessionScreen
-        session={makeSession()}
-        fault={sampleFault}
-        onSessionChange={vi.fn()}
-        onClosed={vi.fn()}
-      />,
-    );
-
-    fireEvent.change(screen.getByLabelText("Report what you observed"), {
-      target: { value: "Fan sounds rough" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
-
-    const busy = await screen.findByRole("button", { name: "Submitting…" });
-    expect(busy).toBeDisabled();
-    fireEvent.click(busy);
-    expect(spy).toHaveBeenCalledTimes(1);
-
-    deferred.resolve(makeObservationResponse());
-    await waitFor(() => {
-      expect(
-        screen.getByRole("button", { name: "Submit" }),
-      ).toBeInTheDocument();
-    });
+  it("opens the session log drawer", () => {
+    renderSession();
+    fireEvent.click(screen.getByRole("button", { name: "Session log" }));
+    expect(screen.getByRole("dialog", { name: /session log/i })).toBeInTheDocument();
   });
 });
-

@@ -11,8 +11,10 @@ export type FieldType = "enum" | "number" | "boolean";
 
 export interface FieldInfo {
   name: string;
+  label: string;
   type: FieldType;
   values: string[] | null;
+  value_labels: Record<string, string> | null;
   unit: string | null;
   description: string;
   ask: string;
@@ -24,12 +26,16 @@ export interface FaultInfo {
   fault_codes: string[];
   description: string;
   fields: FieldInfo[];
+  check_count: number;
 }
 
 export interface Source {
   doc_id: string;
   section: string;
+  /** PDF page used for evidence retrieval. */
   page: number | null;
+  /** Printed page for UI / report when it differs from the PDF page. */
+  printed_page?: number | null;
 }
 
 export interface Check {
@@ -151,7 +157,9 @@ export interface UndoRequest {
 
 export interface FactReport {
   field: string;
+  field_label: string;
   value: unknown;
+  value_label: string;
   reported_at: string;
   event_id: number;
   how: "form" | "observation";
@@ -168,7 +176,10 @@ export interface RootCauseSummary {
 
 export interface CitationUsed {
   doc_id: string;
+  short_name: string;
+  full_title: string;
   section: string;
+  section_label: string;
   page: number | null;
   used_for: string;
   passage: string | null;
@@ -357,11 +368,61 @@ export function isEventUndone(events: Event[], eventId: number): boolean {
   );
 }
 
-/** Format a citation the way the session UI shows it. */
+const DOC_SHORT: Record<string, string> = {
+  abb_acs580_fw: "ABB ACS580 firmware manual",
+};
+
+const DOC_FULL: Record<string, string> = {
+  abb_acs580_fw:
+    "ABB ACS580 standard control program firmware manual, 3AXD50000016097 Rev J",
+};
+
+export function shortDocName(docId: string, fallbackTitle?: string): string {
+  return DOC_SHORT[docId] ?? fallbackTitle ?? docId;
+}
+
+export function fullDocCitation(docId: string, fallbackTitle?: string): string {
+  return DOC_FULL[docId] ?? fallbackTitle ?? docId;
+}
+
+export function sectionShortLabel(section: string): string {
+  let text = section.trim();
+  for (const prefix of ["Fault tracing: ", "Fault tracing:"]) {
+    if (text.startsWith(prefix)) {
+      text = text.slice(prefix.length).trim();
+      break;
+    }
+  }
+  const printed = text.indexOf(" (printed p.");
+  if (printed >= 0) {
+    text = text.slice(0, printed).trim();
+  } else {
+    const plain = text.indexOf(" (p.");
+    if (plain >= 0) {
+      text = text.slice(0, plain).trim();
+    }
+  }
+  return text;
+}
+
+export function displayPage(source: Source): number | null {
+  if (source.printed_page != null) {
+    return source.printed_page;
+  }
+  return source.page;
+}
+
+/** Compact citation line for the current-check panel. */
+export function formatCitationLine(
+  source: Source,
+  evidenceTitle?: string | null,
+): string {
+  const page = displayPage(source);
+  const pageTag = page != null ? ` · [ P. ${page} ]` : "";
+  return `${shortDocName(source.doc_id, evidenceTitle ?? undefined)} · ${sectionShortLabel(source.section)}${pageTag}`;
+}
+
+/** @deprecated Prefer formatCitationLine for the HUD. */
 export function formatSource(source: Source): string {
-  const page =
-    source.page != null && source.page !== undefined
-      ? `, p.${source.page}`
-      : "";
-  return `${source.doc_id}, §${source.section}${page}`;
+  return formatCitationLine(source);
 }

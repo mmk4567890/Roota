@@ -14,20 +14,18 @@ describe("Roota page", () => {
 
     render(<App />);
 
-    expect(screen.getByRole("heading", { name: "Roota" })).toBeInTheDocument();
-    expect(
-      screen.getByText("Stateful fault isolation for industrial drives"),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "ROOTA" })).toBeInTheDocument();
 
     await waitFor(() => {
       expect(
-        screen.getByRole("heading", { name: "Start a diagnostic session" }),
+        screen.getByRole("heading", { name: "Start session" }),
       ).toBeInTheDocument();
     });
-    expect(screen.getByLabelText("Fault")).toBeInTheDocument();
-    expect(screen.getByLabelText("Equipment label")).toBeInTheDocument();
+    expect(screen.getByLabelText("Problem")).toBeInTheDocument();
+    expect(screen.getByLabelText("Equipment")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Start session" }),
     ).toBeInTheDocument();
+    expect(screen.queryByText("MVP")).toBeNull();
   });
 });

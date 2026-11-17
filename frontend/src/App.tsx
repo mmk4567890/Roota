@@ -1,8 +1,8 @@
 import { useState } from "react";
 import type { FaultInfo, ObservationResponse, SessionView } from "./api";
-import { Header } from "./components/Header";
 import { SessionScreen } from "./components/SessionScreen";
 import { StartScreen } from "./components/StartScreen";
+import { TopBar } from "./components/TopBar";
 
 function App() {
   const [session, setSession] = useState<SessionView | null>(null);
@@ -13,34 +13,35 @@ function App() {
   }>({ observation: null, error: null });
 
   return (
-    <div className="min-h-screen">
-      <div className="no-print">
-        <Header />
-      </div>
-      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
-        {session && fault ? (
-          <SessionScreen
-            session={session}
-            key={session.id}
-            fault={fault}
-            initialObservation={initial.observation}
-            initialError={initial.error}
-            onSessionChange={setSession}
-            onClosed={() => {
-              setSession(null);
-              setFault(null);
-            }}
-          />
-        ) : (
-          <StartScreen
-            onStarted={(nextSession, nextFault, nextInitial) => {
-              setSession(nextSession);
-              setFault(nextFault);
-              setInitial(nextInitial);
-            }}
-          />
-        )}
-      </main>
+    <div className="hud-glow min-h-screen">
+      {session && fault ? (
+        <SessionScreen
+          session={session}
+          key={session.id}
+          fault={fault}
+          initialObservation={initial.observation}
+          initialError={initial.error}
+          onSessionChange={setSession}
+          onClosed={() => {
+            setSession(null);
+            setFault(null);
+            setInitial({ observation: null, error: null });
+          }}
+        />
+      ) : (
+        <>
+          <TopBar />
+          <main className="mx-auto flex max-w-content items-start justify-center px-4 py-16 sm:px-6">
+            <StartScreen
+              onStarted={(nextSession, nextFault, nextInitial) => {
+                setSession(nextSession);
+                setFault(nextFault);
+                setInitial(nextInitial);
+              }}
+            />
+          </main>
+        </>
+      )}
     </div>
   );
 }

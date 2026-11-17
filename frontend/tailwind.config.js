@@ -4,26 +4,41 @@ export default {
   theme: {
     extend: {
       colors: {
-        ink: {
-          50: "#f7f8f9",
-          100: "#eef0f2",
-          200: "#d9dde3",
-          300: "#b8c0cb",
-          400: "#8b97a8",
-          500: "#6b7a8d",
-          600: "#556274",
-          700: "#465060",
-          800: "#3c4451",
-          900: "#353b46",
-          950: "#22262e",
-        },
-        accent: {
-          DEFAULT: "#1f6b5c",
-          muted: "#e8f2ef",
+        hud: {
+          bg: "#08090B",
+          glow: "#16181C",
+          surface: "#0D0F12",
+          line: "rgba(255,255,255,0.08)",
+          "line-hover": "rgba(255,255,255,0.16)",
+          text: "#EDEDED",
+          muted: "#8B8F97",
+          faint: "#5A5F68",
+          confirmed: "#4ADE80",
+          escalated: "#F87171",
+          inconclusive: "#FBBF24",
         },
       },
       fontFamily: {
-        sans: ['"Segoe UI"', '"Helvetica Neue"', "Helvetica", "sans-serif"],
+        sans: ['"IBM Plex Sans"', "ui-sans-serif", "system-ui", "sans-serif"],
+        display: ['"IBM Plex Sans"', "ui-sans-serif", "system-ui", "sans-serif"],
+        mono: ['"IBM Plex Mono"', "ui-monospace", "monospace"],
+      },
+      maxWidth: {
+        content: "960px",
+      },
+      transitionDuration: {
+        hud: "120ms",
+      },
+      letterSpacing: {
+        display: "0.1em",
+        label: "0.06em",
+      },
+      fontSize: {
+        12: ["12px", "1.4"],
+        14: ["14px", "1.45"],
+        16: ["16px", "1.5"],
+        20: ["20px", "1.35"],
+        32: ["32px", "1.2"],
       },
     },
   },
