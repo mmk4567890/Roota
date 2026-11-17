@@ -32,10 +32,7 @@ export function OutcomeView({
 
   return (
     <CornerTicks className="bg-transparent px-4 py-5 sm:px-6 sm:py-6">
-      <p className="hud-mono-tag">
-        {isRoot ? "[ OUTCOME ]" : "[ ESCALATION ]"}
-      </p>
-      <h2 className="hud-display mt-3 text-32">
+      <h2 className="hud-display text-32">
         {isRoot ? "ROOT CAUSE" : "ESCALATED"}
       </h2>
 

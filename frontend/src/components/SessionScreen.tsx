@@ -18,6 +18,10 @@ import { ReportView } from "./ReportView";
 import { SessionLogDrawer } from "./SessionLogDrawer";
 import { TopBar } from "./TopBar";
 
+/** Shown after a "Not sure" / unclear chip when the session moves on. */
+export const UNCLEAR_MOVED_ON_MESSAGE =
+  "Marked as not sure. Moving to the next check.";
+
 interface SessionScreenProps {
   session: SessionView;
   fault: FaultInfo;
@@ -110,11 +114,14 @@ export function SessionScreen({
       });
       setLastParse({
         extracted: { [fieldName]: value },
-        unclear_fields: value === "unclear" ? [fieldName] : [],
+        // Unclear is an answer, not a re-ask — the move-on message covers it.
+        unclear_fields: [],
         rejected: [],
         notes: "",
       });
-      setLastMessage(null);
+      setLastMessage(
+        value === "unclear" ? UNCLEAR_MOVED_ON_MESSAGE : null,
+      );
       onSessionChange(updated);
       return true;
     } catch (err) {
