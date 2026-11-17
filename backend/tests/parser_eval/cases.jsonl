@@ -36,6 +36,8 @@
 {"id": "ambient_39c", "text": "Ambient temperature 39°C.", "expected": {"ambient_above_derating_temp": "no"}}
 {"id": "ambient_45c_unclear", "text": "Ambient is about 45 C.", "expected": {"ambient_above_derating_temp": "unclear"}}
 {"id": "ambient_42_unclear", "text": "Ambient temperature 42°C.", "expected": {"ambient_above_derating_temp": "unclear"}}
+{"id": "ambient_48_unclear", "text": "Room ambient is about 48 C.", "expected": {"ambient_above_derating_temp": "unclear"}}
+{"id": "ambient_about_45c_enclosure", "text": "Enclosure ambient is about 45°C.", "expected": {"ambient_above_derating_temp": "unclear"}}
 {"id": "ambient_40_unclear", "text": "Ambient is 40 C.", "expected": {"ambient_above_derating_temp": "unclear"}}
 {"id": "ambient_50_unclear", "text": "Ambient is 50 C.", "expected": {"ambient_above_derating_temp": "unclear"}}
 {"id": "ambient_55_yes", "text": "Ambient is about 55 C.", "expected": {"ambient_above_derating_temp": "yes"}}

@@ -279,3 +279,41 @@ def test_api_session_on_the_real_graph(client: TestClient) -> None:
     assert action["cause_id"] == "cooling_fan_failure"
     assert action["source"]["doc_id"] == MANUAL_DOC_ID
     assert action["source"]["page"] == 541
+
+
+def test_api_ambient_between_derating_limits_is_unclear_with_message(
+    client: TestClient,
+) -> None:
+    created = client.post(
+        "/sessions",
+        json={"fault_id": "acs580_overtemperature", "equipment_label": "Line 5 ACS580"},
+    )
+    assert created.status_code == 201, created.text
+    session_id = created.json()["id"]
+    # Reach the ambient check: cooling path all clear.
+    for text in (
+        "Fan is spinning fine.",
+        "Vents look clear.",
+        "Heatsink is clean.",
+    ):
+        step = client.post(
+            f"/sessions/{session_id}/observations",
+            json={"text": text},
+        )
+        assert step.status_code == 200, step.text
+
+    ambient = client.post(
+        f"/sessions/{session_id}/observations",
+        json={"text": "Ambient is about 45 C."},
+    )
+    assert ambient.status_code == 200, ambient.text
+    body = ambient.json()
+    assert body["parse"]["extracted"] == {}
+    assert body["parse"]["unclear_fields"] == ["ambient_above_derating_temp"]
+    assert body["message"] is not None
+    assert "45" in body["message"]
+    assert "40" in body["message"] and "50" in body["message"]
+    assert "frame" in body["message"].lower()
+    assert "ip" in body["message"].lower()
+    assert "derating" in body["message"].lower()
+    assert body["state"]["facts"].get("ambient_above_derating_temp") == "unclear"

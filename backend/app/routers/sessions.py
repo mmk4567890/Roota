@@ -576,4 +576,8 @@ def _observation_message(parsed: ParseResult) -> str | None:
             "I didn't understand any diagnostic field values in that observation. "
             "Please re-phrase using clearer measurements or statuses."
         )
+    # Parser notes explain ambiguous values (e.g. ambient between derating limits).
+    notes = parsed.notes.strip()
+    if notes:
+        return notes
     return None

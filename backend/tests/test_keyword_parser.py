@@ -5,6 +5,7 @@ import pytest
 from app.engine.schema import FaultGraph, UNCLEAR
 from app.graphs.loader import DEFAULT_GRAPHS_DIR, load_graphs
 from app.parser.keyword_parser import KeywordParser
+from app.parser.validate import validate_parse
 
 
 @pytest.fixture(scope="module")
@@ -91,11 +92,19 @@ def test_ambient_above_50(parser: KeywordParser, acs580: FaultGraph) -> None:
 def test_ambient_between_40_and_50_is_unclear(
     parser: KeywordParser, acs580: FaultGraph
 ) -> None:
-    result = parser.parse(
+    raw = parser.parse(
         "Ambient is about 45 C.", acs580, ["ambient_above_derating_temp"]
     )
-    assert result.extracted["ambient_above_derating_temp"] == UNCLEAR
-    assert "frame" in result.notes.lower() or "ip" in result.notes.lower()
+    assert raw.extracted["ambient_above_derating_temp"] == UNCLEAR
+    assert "40" in raw.notes and "50" in raw.notes
+    assert "derating" in raw.notes.lower()
+    assert "frame" in raw.notes.lower()
+    assert "ip" in raw.notes.lower()
+
+    parsed = validate_parse(raw, acs580)
+    assert "ambient_above_derating_temp" not in parsed.extracted
+    assert parsed.unclear_fields == ["ambient_above_derating_temp"]
+    assert parsed.notes == raw.notes
 
 
 def test_ambient_exactly_40_is_unclear(

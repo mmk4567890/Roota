@@ -203,8 +203,9 @@ def _extract_ambient(
     else:
         extracted["ambient_above_derating_temp"] = UNCLEAR
         notes_parts.append(
-            f"ambient {temp_c:g} °C is between 40 °C and 50 °C; the derating "
-            "limit depends on frame size and IP rating (see hardware manual)"
+            f"{temp_c:g} °C is between the 40 °C and 50 °C derating limits, "
+            "so it depends on the drive's frame and IP rating "
+            "(see the hardware manual's Derating section)"
         )
 
 
