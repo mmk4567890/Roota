@@ -17,8 +17,10 @@ class FieldInfo(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str
+    label: str
     type: Literal["enum", "number", "boolean"]
     values: list[str] | None = None
+    value_labels: dict[str, str] | None = None
     unit: str | None = None
     description: str
     ask: str
@@ -47,8 +49,12 @@ def list_faults(
             fields=[
                 FieldInfo(
                     name=field.name,
+                    label=field.label,
                     type=field.type,
                     values=list(field.values) if field.values is not None else None,
+                    value_labels=(
+                        dict(field.value_labels) if field.value_labels is not None else None
+                    ),
                     unit=field.unit,
                     description=field.description,
                     ask=field.ask,

@@ -180,6 +180,8 @@ def test_contradiction_escalates() -> None:
             "fields": [
                 {
                     "name": "flag_a",
+                    "label": "Flag A",
+                    "value_labels": {"yes": "Yes", "no": "No", "unclear": "Not sure"},
                     "type": "enum",
                     "values": ["yes", "no", "unclear"],
                     "unit": None,
@@ -188,6 +190,8 @@ def test_contradiction_escalates() -> None:
                 },
                 {
                     "name": "flag_b",
+                    "label": "Flag B",
+                    "value_labels": {"yes": "Yes", "no": "No", "unclear": "Not sure"},
                     "type": "enum",
                     "values": ["yes", "no", "unclear"],
                     "unit": None,
@@ -427,6 +431,7 @@ def test_two_promoted_causes_ordered_by_priority() -> None:
             "fields": [
                 {
                     "name": "score_a",
+                    "label": "Score A",
                     "type": "number",
                     "values": None,
                     "unit": None,
@@ -435,6 +440,7 @@ def test_two_promoted_causes_ordered_by_priority() -> None:
                 },
                 {
                     "name": "score_b",
+                    "label": "Score B",
                     "type": "number",
                     "values": None,
                     "unit": None,
@@ -443,6 +449,8 @@ def test_two_promoted_causes_ordered_by_priority() -> None:
                 },
                 {
                     "name": "detail_a",
+                    "label": "Detail A",
+                    "value_labels": {"yes": "Yes", "no": "No", "unclear": "Not sure"},
                     "type": "enum",
                     "values": ["yes", "no", "unclear"],
                     "unit": None,
@@ -451,6 +459,8 @@ def test_two_promoted_causes_ordered_by_priority() -> None:
                 },
                 {
                     "name": "detail_b",
+                    "label": "Detail B",
+                    "value_labels": {"yes": "Yes", "no": "No", "unclear": "Not sure"},
                     "type": "enum",
                     "values": ["yes", "no", "unclear"],
                     "unit": None,
@@ -558,6 +568,8 @@ def test_graph_gap_escalates() -> None:
             "fields": [
                 {
                     "name": "observed",
+                    "label": "Observed",
+                    "value_labels": {"done": "Done", "unclear": "Not sure"},
                     "type": "enum",
                     "values": ["done", "unclear"],
                     "unit": None,

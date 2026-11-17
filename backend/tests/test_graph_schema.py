@@ -23,8 +23,14 @@ def _minimal_graph(**overrides: Any) -> dict[str, Any]:
         "fields": [
             {
                 "name": "fan_status",
+                "label": "Fan status",
                 "type": "enum",
                 "values": ["normal", "not_running", "unclear"],
+                "value_labels": {
+                    "normal": "Normal",
+                    "not_running": "Not running",
+                    "unclear": "Not sure",
+                },
                 "unit": None,
                 "description": "Fan status",
                 "ask": "How is the fan?",
@@ -181,7 +187,30 @@ def test_get_faults_returns_overtemperature(client: TestClient) -> None:
     assert "fan_status" in field_names
     fan = next(field for field in match["fields"] if field["name"] == "fan_status")
     assert fan["type"] == "enum"
+    assert fan["label"] == "Fan status"
+    assert fan["value_labels"]["noisy"] == "Noisy"
     assert "normal" in fan["values"]
+
+
+def test_rejects_enum_field_without_value_labels() -> None:
+    payload = _minimal_graph()
+    del payload["fields"][0]["value_labels"]
+    with pytest.raises(ValidationError, match="value_labels"):
+        FaultGraph.model_validate(payload)
+
+
+def test_rejects_enum_value_labels_missing_entry() -> None:
+    payload = _minimal_graph()
+    del payload["fields"][0]["value_labels"]["unclear"]
+    with pytest.raises(ValidationError, match="missing entries"):
+        FaultGraph.model_validate(payload)
+
+
+def test_rejects_field_with_blank_label() -> None:
+    payload = _minimal_graph()
+    payload["fields"][0]["label"] = "   "
+    with pytest.raises(ValidationError, match="label"):
+        FaultGraph.model_validate(payload)
 
 
 
@@ -232,7 +261,14 @@ def test_rejects_ordering_op_on_enum_field() -> None:
 def test_rejects_non_numeric_value_on_number_field() -> None:
     payload = _minimal_graph()
     payload["fields"].append(
-        {"name": "load_percent", "type": "number", "unit": "%", "description": "Load", "ask": "Load?"}
+        {
+            "name": "load_percent",
+            "label": "Load",
+            "type": "number",
+            "unit": "%",
+            "description": "Load",
+            "ask": "Load?",
+        }
     )
     payload["checks"][0]["collects"] = ["fan_status", "load_percent"]
     _set_ruled_out(payload, {"field": "load_percent", "op": "lt", "value": "low"})
@@ -261,7 +297,7 @@ def test_rejects_list_value_without_in() -> None:
 def test_rejects_values_on_non_enum_field() -> None:
     payload = _minimal_graph()
     payload["fields"].append(
-        {"name": "load_percent", "type": "number", "values": ["high"], "description": "Load", "ask": "Load?"}
+        {"name": "load_percent", "label": "Load", "type": "number", "values": ["high"], "description": "Load", "ask": "Load?"}
     )
     with pytest.raises(ValidationError, match="must not declare values"):
         FaultGraph.model_validate(payload)
@@ -270,7 +306,7 @@ def test_rejects_values_on_non_enum_field() -> None:
 def test_rejects_condition_on_field_the_cause_cannot_collect() -> None:
     payload = _minimal_graph()
     payload["fields"].append(
-        {"name": "ambient_temp_c", "type": "number", "unit": "°C", "description": "Ambient", "ask": "Ambient?"}
+        {"name": "ambient_temp_c", "label": "Ambient", "type": "number", "unit": "°C", "description": "Ambient", "ask": "Ambient?"}
     )
     payload["checks"].append(
         {

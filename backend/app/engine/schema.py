@@ -35,8 +35,12 @@ class GraphModel(BaseModel):
 
 class FieldSpec(GraphModel):
     name: str
+    label: str
     type: Literal["enum", "number", "boolean"]
     values: list[str] | None = None
+    # Human labels for enum values (and optional boolean true/false). Keys must
+    # match every declared value; the UI and report never show raw ids.
+    value_labels: dict[str, str] | None = None
     unit: str | None = None
     description: str
     ask: str
@@ -66,7 +70,11 @@ AnyCondition.model_rebuild()
 class Source(GraphModel):
     doc_id: str
     section: str
+    # PDF page index used to retrieve evidence chunks from the ingested manual.
     page: int | None = None
+    # Printed page number shown in the UI and report (when the manual's print
+    # pagination differs from the PDF page index).
+    printed_page: int | None = None
 
 
 class Check(GraphModel):
@@ -162,6 +170,8 @@ def _reject_duplicates(ids: list[str], kind: str) -> None:
 
 
 def _validate_field_spec(field: FieldSpec) -> None:
+    if not field.label.strip():
+        raise ValueError(f"field '{field.name}' label must be a non-empty string")
     if field.type == "enum":
         if not field.values:
             raise ValueError(f"enum field '{field.name}' must declare a non-empty values list")
@@ -169,8 +179,55 @@ def _validate_field_spec(field: FieldSpec) -> None:
             raise ValueError(f"enum field '{field.name}' values must include '{UNCLEAR}'")
         if len(set(field.values)) != len(field.values):
             raise ValueError(f"enum field '{field.name}' has duplicate values")
-    elif field.values is not None:
-        raise ValueError(f"{field.type} field '{field.name}' must not declare values")
+        if field.value_labels is None:
+            raise ValueError(f"enum field '{field.name}' must declare value_labels")
+        missing = [value for value in field.values if value not in field.value_labels]
+        if missing:
+            raise ValueError(
+                f"enum field '{field.name}' value_labels missing entries for {missing}"
+            )
+        extra = [key for key in field.value_labels if key not in field.values]
+        if extra:
+            raise ValueError(
+                f"enum field '{field.name}' value_labels has unknown values {extra}"
+            )
+        blank = [key for key, label in field.value_labels.items() if not str(label).strip()]
+        if blank:
+            raise ValueError(
+                f"enum field '{field.name}' value_labels must be non-empty for {blank}"
+            )
+    else:
+        if field.values is not None:
+            raise ValueError(f"{field.type} field '{field.name}' must not declare values")
+        if field.value_labels is not None:
+            raise ValueError(
+                f"{field.type} field '{field.name}' must not declare value_labels"
+            )
+
+
+def field_value_label(field: FieldSpec, value: object) -> str:
+    """Return the human label for a stored field value."""
+    if field.value_labels is not None and isinstance(value, str):
+        label = field.value_labels.get(value)
+        if label is not None:
+            return label
+    if field.type == "boolean" and isinstance(value, bool):
+        return "Yes" if value else "No"
+    if value is None:
+        return "—"
+    return str(value)
+
+
+def format_fact(field: FieldSpec, value: object) -> str:
+    """One-line fact for UI / report: ``Fan status: Noisy``."""
+    return f"{field.label}: {field_value_label(field, value)}"
+
+
+def display_page(source: Source) -> int | None:
+    """Printed page when known, otherwise the stored page number."""
+    if source.printed_page is not None:
+        return source.printed_page
+    return source.page
 
 
 def _condition_fields(condition: Condition) -> set[str]:

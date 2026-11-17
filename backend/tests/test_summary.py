@@ -45,13 +45,21 @@ def test_build_summary_root_cause_and_observation_fact() -> None:
     assert summary.escalation_reason is None
     assert len(summary.facts) == 1
     assert summary.facts[0].field == "fan_status"
+    assert summary.facts[0].field_label == "Fan status"
     assert summary.facts[0].value == "not_running"
+    assert summary.facts[0].value_label == "Not running"
     assert summary.facts[0].how == "observation"
     assert summary.facts[0].text == "The cooling fan is not running."
     assert any(c.used_for == "cause:cooling_fan_failure" for c in summary.citations)
+    cite = next(c for c in summary.citations if c.used_for == "cause:cooling_fan_failure")
+    assert cite.page == 543  # printed page, not PDF 541
+    assert cite.short_name == "ABB ACS580 firmware manual"
     md = render_markdown(summary)
     assert "Cooling fan not operating" in md
     assert "typed observation" in md
+    assert "Fan status: Not running" in md
+    assert "fan_status" not in md
+    assert "not_running" not in md
 
 
 def test_summary_marks_undone_facts(client: TestClient) -> None:
@@ -131,7 +139,8 @@ def test_summary_form_vs_observation_and_markdown(client: TestClient) -> None:
     assert md.status_code == 200, md.text
     assert "text/markdown" in md.headers["content-type"]
     assert "Packer ACS580" in md.text
-    assert "fan_status" in md.text
+    assert "Fan status" in md.text
+    assert "fan_status" not in md.text
 
 
 def test_summary_citations_include_passage_field(client: TestClient) -> None:

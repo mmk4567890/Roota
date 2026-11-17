@@ -14,7 +14,14 @@ from pydantic import BaseModel, ConfigDict
 
 from app.engine.engine import CauseStatus, DiagnosticState
 from app.engine.replay import is_event_undone, session_is_closed
-from app.engine.schema import FaultGraph, Source
+from app.engine.schema import (
+    FaultGraph,
+    FieldSpec,
+    Source,
+    display_page,
+    field_value_label,
+)
+from app.manuals import full_doc_citation, section_short_label, short_doc_name
 from app.models import Event
 
 
@@ -24,7 +31,9 @@ class FactReport(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     field: str
+    field_label: str
     value: Any
+    value_label: str
     reported_at: datetime
     event_id: int
     how: Literal["form", "observation"]
@@ -45,7 +54,12 @@ class CitationUsed(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     doc_id: str
+    # Short name for compact UI lines; full title+number for expanded passages.
+    short_name: str
+    full_title: str
     section: str
+    section_label: str
+    # Printed page when the graph provides one; otherwise the PDF page.
     page: int | None
     used_for: str
     # Verbatim manual passage when the doc is ingested; None when unavailable.
@@ -102,10 +116,10 @@ def build_summary(
         status="closed" if closed else "active",
         started_at=started_at,
         closed_at=closed_at,
-        causes=list(state.causes),
+        causes=_labeled_causes(graph, state.causes),
         root_cause=root_cause,
         escalation_reason=escalation_reason,
-        facts=_fact_reports(events),
+        facts=_fact_reports(events, graph),
         citations=_citations_used(graph, state),
     )
 
@@ -152,8 +166,9 @@ def render_markdown(summary: SessionSummary) -> str:
 
     lines.extend(["## Cause statuses", ""])
     for cause in summary.causes:
+        status_label = _cause_status_label(cause.status)
         because = f" — {', '.join(cause.because)}" if cause.because else ""
-        lines.append(f"- **{cause.name}** (`{cause.cause_id}`): {cause.status}{because}")
+        lines.append(f"- **{cause.name}**: {status_label}{because}")
     lines.append("")
 
     lines.extend(["## Facts reported", ""])
@@ -165,7 +180,7 @@ def render_markdown(summary: SessionSummary) -> str:
             how = "typed observation" if fact.how == "observation" else "form"
             text_bit = f' — "{fact.text}"' if fact.text else ""
             lines.append(
-                f"- `{fact.field}` = {fact.value!r} via {how} at "
+                f"- {fact.field_label}: {fact.value_label} via {how} at "
                 f"{fact.reported_at.isoformat()}{text_bit}{undone}"
             )
     lines.append("")
@@ -177,9 +192,11 @@ def render_markdown(summary: SessionSummary) -> str:
         for cite in summary.citations:
             page = f", p. {cite.page}" if cite.page is not None else ""
             lines.append(
-                f"- `{cite.doc_id}` §{cite.section}{page} — {cite.used_for}"
+                f"- {cite.short_name} · {cite.section_label}{page} — {cite.used_for}"
             )
             if cite.passage:
+                lines.append("")
+                lines.append(f"  _{cite.full_title}_")
                 lines.append("")
                 lines.append(f"  > {cite.passage}")
                 lines.append("")
@@ -187,14 +204,65 @@ def render_markdown(summary: SessionSummary) -> str:
     return "\n".join(lines)
 
 
-def _fact_reports(events: list[Event]) -> list[FactReport]:
+def _field_spec(graph: FaultGraph, field_name: str) -> FieldSpec | None:
+    return next((field for field in graph.fields if field.name == field_name), None)
+
+
+def _because_labels(graph: FaultGraph, because: list[str]) -> list[str]:
+    labels: list[str] = []
+    for name in because:
+        spec = _field_spec(graph, name)
+        labels.append(spec.label if spec is not None else name)
+    return labels
+
+
+def _labeled_causes(graph: FaultGraph, causes: list[CauseStatus]) -> list[CauseStatus]:
+    return [
+        cause.model_copy(update={"because": _because_labels(graph, cause.because)})
+        for cause in causes
+    ]
+
+
+def _fact_report(
+    *,
+    graph: FaultGraph,
+    field: str,
+    value: Any,
+    reported_at: datetime,
+    event_id: int,
+    how: Literal["form", "observation"],
+    text: str | None,
+    undone: bool,
+) -> FactReport:
+    spec = _field_spec(graph, field)
+    if spec is None:
+        field_label = field
+        value_label = str(value)
+    else:
+        field_label = spec.label
+        value_label = field_value_label(spec, value)
+    return FactReport(
+        field=field,
+        field_label=field_label,
+        value=value,
+        value_label=value_label,
+        reported_at=reported_at,
+        event_id=event_id,
+        how=how,
+        text=text,
+        undone=undone,
+    )
+
+
+def _fact_reports(events: list[Event], graph: FaultGraph) -> list[FactReport]:
     reports: list[FactReport] = []
     for event in events:
         if event.type == "facts_reported":
             facts = dict(event.payload.get("facts") or {})
             for field, value in facts.items():
                 reports.append(
-                    FactReport(
+                    _fact_report(
+                        graph=graph,
                         field=str(field),
                         value=value,
                         reported_at=event.created_at,
@@ -210,7 +278,8 @@ def _fact_reports(events: list[Event]) -> list[FactReport]:
             extracted = dict(event.payload.get("extracted") or {})
             for field, value in extracted.items():
                 reports.append(
-                    FactReport(
+                    _fact_report(
+                        graph=graph,
                         field=str(field),
                         value=value,
                         reported_at=event.created_at,
@@ -222,7 +291,8 @@ def _fact_reports(events: list[Event]) -> list[FactReport]:
                 )
             for field in event.payload.get("unclear_fields") or []:
                 reports.append(
-                    FactReport(
+                    _fact_report(
+                        graph=graph,
                         field=str(field),
                         value="unclear",
                         reported_at=event.created_at,
@@ -241,15 +311,19 @@ def _citations_used(graph: FaultGraph, state: DiagnosticState) -> list[CitationU
     seen: set[tuple[str, str, int | None, str]] = set()
 
     def add(source: Source, used_for: str) -> None:
-        key = (source.doc_id, source.section, source.page, used_for)
+        page = display_page(source)
+        key = (source.doc_id, source.section, page, used_for)
         if key in seen:
             return
         seen.add(key)
         citations.append(
             CitationUsed(
                 doc_id=source.doc_id,
+                short_name=short_doc_name(source.doc_id),
+                full_title=full_doc_citation(source.doc_id),
                 section=source.section,
-                page=source.page,
+                section_label=section_short_label(source.section),
+                page=page,
                 used_for=used_for,
             )
         )
@@ -275,8 +349,22 @@ def _closed_at(events: list[Event]) -> datetime | None:
 
 
 def _format_source(source: Source) -> str:
-    page = f", p. {source.page}" if source.page is not None else ""
-    return f"Source: `{source.doc_id}` §{source.section}{page}"
+    page = display_page(source)
+    page_bit = f", p. {page}" if page is not None else ""
+    return (
+        f"Source: {short_doc_name(source.doc_id)} · "
+        f"{section_short_label(source.section)}{page_bit}"
+    )
+
+
+def _cause_status_label(status: str) -> str:
+    return {
+        "confirmed": "Confirmed",
+        "ruled_out": "Ruled out",
+        "contradiction": "Contradiction",
+        "open": "Open",
+        "inconclusive": "Inconclusive",
+    }.get(status, status.replace("_", " ").title())
 
 
 def with_citation_passages(
