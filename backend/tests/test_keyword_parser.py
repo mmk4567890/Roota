@@ -55,9 +55,12 @@ def test_fan_not_noisy_alone_is_unclear(
 ) -> None:
     raw = parser.parse("The fan is not noisy.", acs580, ["fan_status"])
     assert raw.extracted["fan_status"] == UNCLEAR
+    assert "whether the fan is running" in raw.notes
+    assert "running normally" in raw.notes
     parsed = validate_parse(raw, acs580)
     assert "fan_status" not in parsed.extracted
     assert parsed.unclear_fields == ["fan_status"]
+    assert parsed.notes == raw.notes
 
 
 def test_fan_running_and_not_noisy_is_normal(

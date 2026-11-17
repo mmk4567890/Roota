@@ -281,6 +281,29 @@ def test_api_session_on_the_real_graph(client: TestClient) -> None:
     assert action["source"]["page"] == 541
 
 
+def test_api_fan_not_noisy_alone_is_unclear_with_message(client: TestClient) -> None:
+    created = client.post(
+        "/sessions",
+        json={"fault_id": "acs580_overtemperature", "equipment_label": "Line 6 ACS580"},
+    )
+    assert created.status_code == 201, created.text
+    session_id = created.json()["id"]
+
+    observed = client.post(
+        f"/sessions/{session_id}/observations",
+        json={"text": "The fan is not noisy.", "check_id": "check_fan_operation"},
+    )
+    assert observed.status_code == 200, observed.text
+    body = observed.json()
+    assert body["parse"]["extracted"] == {}
+    assert body["parse"]["unclear_fields"] == ["fan_status"]
+    assert body["message"] is not None
+    assert "whether the fan is running" in body["message"]
+    assert "running normally" in body["message"]
+    assert "not running" in body["message"]
+    assert body["state"]["facts"].get("fan_status") == "unclear"
+
+
 def test_api_ambient_between_derating_limits_is_unclear_with_message(
     client: TestClient,
 ) -> None:

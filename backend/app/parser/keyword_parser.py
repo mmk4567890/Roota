@@ -56,7 +56,7 @@ class KeywordParser:
         extracted: dict[str, object] = {}
         notes_parts: list[str] = []
 
-        _extract_fan_status(lower, extracted)
+        _extract_fan_status(lower, extracted, notes_parts)
         _extract_airflow(lower, extracted)
         _extract_heatsink(lower, extracted)
         _extract_ambient(lower, extracted, notes_parts)
@@ -79,7 +79,17 @@ class KeywordParser:
         )
 
 
-def _extract_fan_status(lower: str, extracted: dict[str, object]) -> None:
+_FAN_NOT_NOISY_UNCLEAR = (
+    "Not being noisy doesn't tell us whether the fan is running. "
+    "Is it running normally, or not running?"
+)
+
+
+def _extract_fan_status(
+    lower: str,
+    extracted: dict[str, object],
+    notes_parts: list[str],
+) -> None:
     if "fan" not in lower:
         return
     if re.search(r"not\s+running|stopped|dead|\bisn'?t\s+running|is\s+not\s+running", lower):
@@ -99,6 +109,7 @@ def _extract_fan_status(lower: str, extracted: dict[str, object]) -> None:
             extracted["fan_status"] = "normal"
         else:
             extracted["fan_status"] = UNCLEAR
+            notes_parts.append(_FAN_NOT_NOISY_UNCLEAR)
         return
     if noisy:
         extracted["fan_status"] = "noisy"
