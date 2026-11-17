@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from app import main as main_module
 from app.main import app
-from app.parser.fake import KeywordParser
+from app.parser.keyword_parser import KeywordParser
 from app.repository import SQLiteSessionRepository
 from app.retrieval.embeddings import FakeEmbeddingFunction
 from app.retrieval.store import ManualStore

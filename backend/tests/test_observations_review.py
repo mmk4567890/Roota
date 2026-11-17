@@ -25,7 +25,7 @@ from app.parser.anthropic_parser import (
 )
 from app.parser.base import ParseError, ParseResult
 from app.parser.factory import create_parser_from_env
-from app.parser.fake import KeywordParser
+from app.parser.keyword_parser import KeywordParser
 from app.parser.validate import validate_parse
 from app.repository import SQLiteSessionRepository
 from app.routers import sessions

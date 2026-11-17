@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from app.engine.engine import evaluate
 from app.engine.schema import FaultGraph, Source
 from app.graphs.loader import DEFAULT_GRAPHS_DIR, load_graphs
-from app.parser.fake import KeywordParser
+from app.parser.keyword_parser import KeywordParser
 
 MANUAL_DOC_ID = "abb_acs580_fw"
 MANUAL_PAGES = 632
@@ -224,10 +224,12 @@ def test_keyword_parser_reads_the_cooling_fields(acs580: FaultGraph) -> None:
     assert result.extracted == {"fan_status": "normal", "heatsink_condition": "dusty"}
 
 
-def test_keyword_parser_reports_fields_this_graph_lacks(acs580: FaultGraph) -> None:
+def test_keyword_parser_ignores_bare_load_percent(acs580: FaultGraph) -> None:
+    # A bare load percentage is not one of the ACS580 enum fields; do not invent
+    # load_within_derated_capacity from it.
     result = KeywordParser().parse("Drive load is 95%.", acs580, [])
     assert result.extracted == {}
-    assert "'load_percent' was mentioned but fault 'acs580_overtemperature' has no such field" in result.notes
+    assert "load_within_derated_capacity" not in result.extracted
 
 
 def test_api_session_on_the_real_graph(client: TestClient) -> None:

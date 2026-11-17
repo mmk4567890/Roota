@@ -18,7 +18,7 @@ from app.parser.anthropic_parser import (
     AnthropicParser,
 )
 from app.parser.base import ParseError, ParseResult
-from app.parser.fake import KeywordParser
+from app.parser.keyword_parser import KeywordParser
 from app.parser.factory import create_parser_from_env
 from app.routers import sessions
 
@@ -81,13 +81,14 @@ def test_observations_full_scenario_with_keyword_parser(client: TestClient) -> N
     assert blocked["status"] == "ruled_out"
     assert body2["state"]["next_action"]["check"]["id"] == "check_load_level"
 
+    # load_percent is fixture-graph only; the keyword parser targets ACS580 enums.
+    # Direct facts entry is the fallback when the utterance has no supported field.
     step3 = client.post(
-        f"/sessions/{session_id}/observations",
-        json={"text": "The drive load is 95%."},
+        f"/sessions/{session_id}/facts",
+        json={"facts": {"load_percent": 95}, "check_id": "check_load_level"},
     )
     assert step3.status_code == 200, step3.text
     body3 = step3.json()
-    assert body3["parse"]["extracted"]["load_percent"] == 95
     assert body3["state"]["facts"]["load_percent"] == 95
     assert body3["state"]["next_action"]["check"]["id"] == "check_load_duty_cycle"
     assert body3["state"]["next_action"]["cause_id"] == "excessive_load"

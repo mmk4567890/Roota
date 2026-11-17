@@ -2,15 +2,14 @@ from __future__ import annotations
 
 import pytest
 
-from app.engine.schema import FaultGraph
-from app.graphs.loader import load_graphs
-from tests.graph_fixtures import TEST_GRAPHS_DIR
-from app.parser.fake import KeywordParser
+from app.engine.schema import FaultGraph, UNCLEAR
+from app.graphs.loader import DEFAULT_GRAPHS_DIR, load_graphs
+from app.parser.keyword_parser import KeywordParser
 
 
 @pytest.fixture(scope="module")
-def overtemperature() -> FaultGraph:
-    return load_graphs(TEST_GRAPHS_DIR)["overtemperature"]
+def acs580() -> FaultGraph:
+    return load_graphs(DEFAULT_GRAPHS_DIR)["acs580_overtemperature"]
 
 
 @pytest.fixture
@@ -19,25 +18,24 @@ def parser() -> KeywordParser:
 
 
 def test_fan_running_and_heatsink_clean(
-    parser: KeywordParser, overtemperature: FaultGraph
+    parser: KeywordParser, acs580: FaultGraph
 ) -> None:
     result = parser.parse(
         "The fan is running normally and the heatsink is clean.",
-        overtemperature,
+        acs580,
         ["fan_status"],
     )
     assert result.extracted["fan_status"] == "normal"
     assert result.extracted["heatsink_condition"] == "clean"
     assert "airflow_obstruction" not in result.extracted
-    assert "load_percent" not in result.extracted
 
 
 def test_fan_spinning_vents_packed_with_dust(
-    parser: KeywordParser, overtemperature: FaultGraph
+    parser: KeywordParser, acs580: FaultGraph
 ) -> None:
     result = parser.parse(
         "Fan is spinning fine but the vents are packed with dust.",
-        overtemperature,
+        acs580,
         ["fan_status"],
     )
     assert result.extracted["fan_status"] == "normal"
@@ -46,51 +44,122 @@ def test_fan_spinning_vents_packed_with_dust(
     assert "heatsink_condition" not in result.extracted
 
 
-def test_clean_airflow_close_to_rated_load_does_not_guess_percent(
-    parser: KeywordParser, overtemperature: FaultGraph
-) -> None:
-    result = parser.parse(
-        "Heatsink is clean and airflow is unobstructed, but the drive is "
-        "operating close to its rated load.",
-        overtemperature,
-        ["heatsink_condition", "airflow_obstruction"],
-    )
-    assert result.extracted["heatsink_condition"] == "clean"
-    assert result.extracted["airflow_obstruction"] == "none"
-    # TODO(roota): do not invent a load_percent for "close to rated".
-    assert "load_percent" not in result.extracted
-    assert "TODO(roota)" in result.notes
-    assert "rated" in result.notes.lower() or "load_percent" in result.notes
-
-
-def test_fan_not_running(parser: KeywordParser, overtemperature: FaultGraph) -> None:
-    result = parser.parse(
-        "The cooling fan is not running.",
-        overtemperature,
-        ["fan_status"],
-    )
+def test_fan_not_running(parser: KeywordParser, acs580: FaultGraph) -> None:
+    result = parser.parse("The cooling fan is not running.", acs580, ["fan_status"])
     assert result.extracted["fan_status"] == "not_running"
 
 
-def test_explicit_load_percent(
-    parser: KeywordParser, overtemperature: FaultGraph
+def test_fan_not_noisy_is_normal(parser: KeywordParser, acs580: FaultGraph) -> None:
+    result = parser.parse("The fan is not noisy.", acs580, ["fan_status"])
+    assert result.extracted["fan_status"] == "normal"
+
+
+def test_heatsink_no_dust_is_clean(parser: KeywordParser, acs580: FaultGraph) -> None:
+    result = parser.parse("Heatsink has no dust.", acs580, ["heatsink_condition"])
+    assert result.extracted["heatsink_condition"] == "clean"
+
+
+def test_air_path_open(parser: KeywordParser, acs580: FaultGraph) -> None:
+    result = parser.parse("The air path is open.", acs580, ["airflow_obstruction"])
+    assert result.extracted["airflow_obstruction"] == "none"
+
+
+def test_vents_partly_blocked(parser: KeywordParser, acs580: FaultGraph) -> None:
+    result = parser.parse("Vents are partly blocked.", acs580, ["airflow_obstruction"])
+    assert result.extracted["airflow_obstruction"] == "partial"
+
+
+def test_ambient_cool_room(parser: KeywordParser, acs580: FaultGraph) -> None:
+    result = parser.parse("Room is cool.", acs580, ["ambient_above_derating_temp"])
+    assert result.extracted["ambient_above_derating_temp"] == "no"
+
+
+def test_ambient_below_40(parser: KeywordParser, acs580: FaultGraph) -> None:
+    result = parser.parse(
+        "Ambient is about 35 C.", acs580, ["ambient_above_derating_temp"]
+    )
+    assert result.extracted["ambient_above_derating_temp"] == "no"
+
+
+def test_ambient_above_50(parser: KeywordParser, acs580: FaultGraph) -> None:
+    result = parser.parse(
+        "Ambient is about 55 C.", acs580, ["ambient_above_derating_temp"]
+    )
+    assert result.extracted["ambient_above_derating_temp"] == "yes"
+
+
+def test_ambient_between_40_and_50_is_unclear(
+    parser: KeywordParser, acs580: FaultGraph
 ) -> None:
     result = parser.parse(
-        "Drive load is at 95%.",
-        overtemperature,
-        ["load_percent"],
+        "Ambient is about 45 C.", acs580, ["ambient_above_derating_temp"]
     )
-    assert result.extracted["load_percent"] == 95
+    assert result.extracted["ambient_above_derating_temp"] == UNCLEAR
+    assert "frame" in result.notes.lower() or "ip" in result.notes.lower()
+
+
+def test_ambient_exactly_40_is_unclear(
+    parser: KeywordParser, acs580: FaultGraph
+) -> None:
+    result = parser.parse("Ambient temperature 40 C.", acs580, [])
+    assert result.extracted["ambient_above_derating_temp"] == UNCLEAR
+
+
+def test_ambient_exactly_50_is_unclear(
+    parser: KeywordParser, acs580: FaultGraph
+) -> None:
+    # Above 50 = yes; at 50 the limit still depends on frame/IP.
+    result = parser.parse("Ambient is 50 C.", acs580, [])
+    assert result.extracted["ambient_above_derating_temp"] == UNCLEAR
+
+
+def test_motor_exceeds_drive_kw(parser: KeywordParser, acs580: FaultGraph) -> None:
+    result = parser.parse(
+        "Motor is 75 kW, drive is 55 kW.", acs580, ["motor_power_vs_drive"]
+    )
+    assert result.extracted["motor_power_vs_drive"] == "exceeds"
+
+
+def test_motor_matches_drive(parser: KeywordParser, acs580: FaultGraph) -> None:
+    result = parser.parse(
+        "Motor matches the drive.", acs580, ["motor_power_vs_drive"]
+    )
+    assert result.extracted["motor_power_vs_drive"] == "within"
+
+
+def test_motor_vs_drive_hp(parser: KeywordParser, acs580: FaultGraph) -> None:
+    result = parser.parse(
+        "Motor is 100 hp and the drive is 50 hp.", acs580, ["motor_power_vs_drive"]
+    )
+    assert result.extracted["motor_power_vs_drive"] == "exceeds"
+
+
+def test_load_within_derated(parser: KeywordParser, acs580: FaultGraph) -> None:
+    result = parser.parse(
+        "Load is within the derated rating.",
+        acs580,
+        ["load_within_derated_capacity"],
+    )
+    assert result.extracted["load_within_derated_capacity"] == "yes"
+
+
+def test_full_load_in_heat(parser: KeywordParser, acs580: FaultGraph) -> None:
+    result = parser.parse(
+        "Running at full load in this heat.",
+        acs580,
+        ["load_within_derated_capacity"],
+    )
+    assert result.extracted["load_within_derated_capacity"] == "no"
 
 
 def test_unsupported_graph_returns_empty(
-    parser: KeywordParser, overtemperature: FaultGraph
+    parser: KeywordParser, acs580: FaultGraph
 ) -> None:
     renamed = [
         field.model_copy(update={"name": f"other_{field.name}"})
-        for field in overtemperature.fields
+        for field in acs580.fields
     ]
-    other = overtemperature.model_copy(update={"fault_id": "other_fault", "fields": renamed})
+    other = acs580.model_copy(update={"fault_id": "other_fault", "fields": renamed})
     result = parser.parse("fan is fine", other, ["other_fan_status"])
     assert result.extracted == {}
     assert "knows none of the fields of fault_id 'other_fault'" in result.notes

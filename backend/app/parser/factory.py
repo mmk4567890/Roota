@@ -4,7 +4,7 @@ import os
 
 from app.parser.anthropic_parser import AnthropicParser
 from app.parser.base import ObservationParser
-from app.parser.fake import KeywordParser
+from app.parser.keyword_parser import KeywordParser
 
 DEFAULT_PARSER = "keyword"
 

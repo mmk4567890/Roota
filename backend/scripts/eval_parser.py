@@ -16,15 +16,18 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
+from app.engine.schema import UNCLEAR
+from app.graphs.loader import DEFAULT_GRAPHS_DIR as SHIPPED_GRAPHS_DIR
 from app.graphs.loader import load_graphs
 from app.parser.anthropic_parser import AnthropicParser
-from app.parser.fake import KeywordParser
 from app.parser.base import ParseError
+from app.parser.keyword_parser import KeywordParser
 from app.parser.validate import validate_parse
 
 DEFAULT_CASES = BACKEND_ROOT / "tests" / "parser_eval" / "cases.jsonl"
-# cases.jsonl is written for the generic test graph (tests/fixtures/graphs).
-DEFAULT_GRAPHS_DIR = BACKEND_ROOT / "tests" / "fixtures" / "graphs"
+# cases.jsonl targets the shipped ACS580 overtemperature graph.
+DEFAULT_GRAPHS_DIR = SHIPPED_GRAPHS_DIR
+DEFAULT_FAULT_ID = "acs580_overtemperature"
 
 
 def _load_cases(path: Path) -> list[dict]:
@@ -72,8 +75,8 @@ def main() -> int:
     )
     parser.add_argument(
         "--fault-id",
-        default="overtemperature",
-        help="Fault graph id to evaluate against",
+        default=DEFAULT_FAULT_ID,
+        help=f"Fault graph id to evaluate against (default: {DEFAULT_FAULT_ID})",
     )
     parser.add_argument(
         "--graphs-dir",
@@ -137,6 +140,19 @@ def main() -> int:
         case_ok = True
         for field_name, expected_value in expected.items():
             field_total += 1
+            # validate_parse moves "unclear" out of extracted into unclear_fields.
+            if expected_value == UNCLEAR:
+                if field_name in parsed.unclear_fields and field_name not in parsed.extracted:
+                    field_hits += 1
+                else:
+                    case_ok = False
+                    failures.append(
+                        f"{case_id}: expected {field_name} unclear, "
+                        f"extracted={parsed.extracted!r} "
+                        f"unclear_fields={parsed.unclear_fields!r}"
+                    )
+                continue
+
             actual = parsed.extracted.get(field_name)
             if field_name in parsed.extracted and _values_match(actual, expected_value):
                 field_hits += 1
@@ -149,11 +165,11 @@ def main() -> int:
 
         for field_name in absent:
             field_total += 1
-            if field_name in parsed.extracted:
+            if field_name in parsed.extracted or field_name in parsed.unclear_fields:
                 case_ok = False
+                got = parsed.extracted.get(field_name, f"unclear:{field_name}")
                 failures.append(
-                    f"{case_id}: expected {field_name} absent, "
-                    f"got {parsed.extracted[field_name]!r}"
+                    f"{case_id}: expected {field_name} absent, got {got!r}"
                 )
             else:
                 field_hits += 1

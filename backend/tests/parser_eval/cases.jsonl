@@ -1,42 +1,70 @@
 {"id": "fan_running_normally", "text": "The fan is running normally and the heatsink is clean.", "expected": {"fan_status": "normal", "heatsink_condition": "clean"}}
 {"id": "fan_spinning_vents_dust", "text": "Fan is spinning fine but the vents are packed with dust.", "expected": {"fan_status": "normal", "airflow_obstruction": "blocked"}, "absent": ["heatsink_condition"]}
-{"id": "clean_close_to_rated", "text": "Heatsink is clean and airflow is unobstructed, but the drive is operating close to its rated load.", "expected": {"heatsink_condition": "clean", "airflow_obstruction": "none"}, "absent": ["load_percent"]}
 {"id": "fan_not_running", "text": "Cooling fan is not running.", "expected": {"fan_status": "not_running"}}
 {"id": "fan_stopped", "text": "The fan has stopped.", "expected": {"fan_status": "not_running"}}
 {"id": "fan_dead", "text": "Fan looks dead.", "expected": {"fan_status": "not_running"}}
 {"id": "fan_noisy", "text": "The cooling fan is noisy.", "expected": {"fan_status": "noisy"}}
+{"id": "fan_running_noisy", "text": "Fan is running but noisy.", "expected": {"fan_status": "noisy"}}
+{"id": "fan_rattling", "text": "Fan is rattling a bit.", "expected": {"fan_status": "noisy"}}
 {"id": "fan_fine", "text": "Fan is fine.", "expected": {"fan_status": "normal"}}
 {"id": "fan_spinning", "text": "Fan is spinning.", "expected": {"fan_status": "normal"}}
+{"id": "fan_not_noisy", "text": "The fan is not noisy.", "expected": {"fan_status": "normal"}}
+{"id": "fan_isnt_noisy", "text": "Fan isn't noisy today.", "expected": {"fan_status": "normal"}}
 {"id": "heatsink_clean_only", "text": "Heatsink is clean.", "expected": {"heatsink_condition": "clean"}}
 {"id": "heatsink_dusty", "text": "The heatsink is dusty.", "expected": {"heatsink_condition": "dusty"}}
 {"id": "heatsink_full_of_dust", "text": "Heatsink fins are full of dust.", "expected": {"heatsink_condition": "dusty"}}
+{"id": "heatsink_no_dust", "text": "Heatsink has no dust.", "expected": {"heatsink_condition": "clean"}}
+{"id": "heatsink_not_dusty", "text": "Heat sink is not dusty.", "expected": {"heatsink_condition": "clean"}}
+{"id": "dust_everywhere_no_heatsink", "text": "There's dust everywhere.", "expected": {}, "absent": ["heatsink_condition", "airflow_obstruction"]}
 {"id": "airflow_unobstructed", "text": "Airflow is unobstructed.", "expected": {"airflow_obstruction": "none"}}
 {"id": "vents_clear", "text": "Vents look clear.", "expected": {"airflow_obstruction": "none"}}
+{"id": "vents_are_clear", "text": "The vents are clear.", "expected": {"airflow_obstruction": "none"}}
+{"id": "air_path_open", "text": "The air path is open.", "expected": {"airflow_obstruction": "none"}}
+{"id": "air_path_open_alt", "text": "Air path open through the cabinet.", "expected": {"airflow_obstruction": "none"}}
 {"id": "vents_blocked", "text": "Outlet vents are blocked.", "expected": {"airflow_obstruction": "blocked"}}
 {"id": "vents_clogged", "text": "Inlet is clogged with debris.", "expected": {"airflow_obstruction": "blocked"}}
+{"id": "vents_partly_blocked", "text": "Vents are partly blocked.", "expected": {"airflow_obstruction": "partial"}}
+{"id": "vents_partially_blocked", "text": "Inlet partially blocked by cardboard.", "expected": {"airflow_obstruction": "partial"}}
 {"id": "airflow_partial_dust", "text": "Some dust in the airflow path.", "expected": {"airflow_obstruction": "partial"}}
-{"id": "load_95", "text": "Drive load is 95%.", "expected": {"load_percent": 95}}
-{"id": "load_110_percent", "text": "Current load reading 110 %.", "expected": {"load_percent": 110}}
-{"id": "load_80_near_word", "text": "Operating at 80% load.", "expected": {"load_percent": 80}}
-{"id": "load_42_point_5", "text": "Load shows 42.5%.", "expected": {"load_percent": 42.5}}
-{"id": "ambient_35c", "text": "Ambient around the drive is 35 C.", "expected": {"ambient_temp_c": 35}}
-{"id": "ambient_42", "text": "Ambient temperature 42°C.", "expected": {"ambient_temp_c": 42}}
-{"id": "ambient_room_28", "text": "Room ambient is 28c near the enclosure.", "expected": {"ambient_temp_c": 28}}
-{"id": "carrier_12khz", "text": "Carrier frequency is set to 12 kHz.", "expected": {"carrier_frequency_khz": 12}}
-{"id": "carrier_4_khz", "text": "PWM carrier at 4kHz.", "expected": {"carrier_frequency_khz": 4}}
-{"id": "carrier_16", "text": "Carrier is 16 kHz on this drive.", "expected": {"carrier_frequency_khz": 16}}
-{"id": "sustained_high", "text": "Load is sustained near rating for long periods.", "expected": {"high_load_sustained": "yes"}}
-{"id": "brief_peaks_only", "text": "Only brief peaks above rated, not sustained.", "expected": {"high_load_sustained": "no"}}
-{"id": "fan_and_load", "text": "Fan running normally, load at 70%.", "expected": {"fan_status": "normal", "load_percent": 70}}
-{"id": "clean_path_and_heatsink", "text": "Airflow unobstructed and heatsink clean.", "expected": {"airflow_obstruction": "none", "heatsink_condition": "clean"}}
-{"id": "dusty_heatsink_blocked_vents", "text": "Heatsink dusty and vents blocked.", "expected": {"heatsink_condition": "dusty", "airflow_obstruction": "blocked"}}
-{"id": "nothing_useful", "text": "I checked the panel and left.", "expected": {}, "absent": ["fan_status", "load_percent", "heatsink_condition"]}
-{"id": "near_rated_no_number", "text": "Drive is running close to rated load.", "expected": {}, "absent": ["load_percent"]}
-{"id": "around_rated_no_number", "text": "It's around rated current right now.", "expected": {}, "absent": ["load_percent"]}
-{"id": "fan_running_noisy", "text": "Fan is running but noisy.", "expected": {"fan_status": "noisy"}}
-{"id": "percent_without_load_word", "text": "Humidity is 40%.", "expected": {}, "absent": ["load_percent"]}
-{"id": "temp_without_ambient_word", "text": "Motor winding is 90 C.", "expected": {}, "absent": ["ambient_temp_c"]}
-{"id": "khz_without_carrier", "text": "Encoder signal at 10 kHz.", "expected": {}, "absent": ["carrier_frequency_khz"]}
+{"id": "airflow_unclear_not_none", "text": "Whether the airflow is blocked is unclear.", "expected": {}, "absent": ["airflow_obstruction"]}
+{"id": "vents_clearly_debris_not_none", "text": "The vents clearly have debris.", "expected": {"airflow_obstruction": "partial"}, "absent": []}
+{"id": "ambient_cool_room", "text": "Room is cool.", "expected": {"ambient_above_derating_temp": "no"}}
+{"id": "ambient_cold_enclosure", "text": "Enclosure ambient feels cold.", "expected": {"ambient_above_derating_temp": "no"}}
+{"id": "ambient_hot_room", "text": "Room is hot around the drive.", "expected": {"ambient_above_derating_temp": "yes"}}
+{"id": "ambient_35c", "text": "Ambient around the drive is 35 C.", "expected": {"ambient_above_derating_temp": "no"}}
+{"id": "ambient_about_35", "text": "Ambient is about 35 C.", "expected": {"ambient_above_derating_temp": "no"}}
+{"id": "ambient_39c", "text": "Ambient temperature 39°C.", "expected": {"ambient_above_derating_temp": "no"}}
+{"id": "ambient_45c_unclear", "text": "Ambient is about 45 C.", "expected": {"ambient_above_derating_temp": "unclear"}}
+{"id": "ambient_42_unclear", "text": "Ambient temperature 42°C.", "expected": {"ambient_above_derating_temp": "unclear"}}
+{"id": "ambient_40_unclear", "text": "Ambient is 40 C.", "expected": {"ambient_above_derating_temp": "unclear"}}
+{"id": "ambient_50_unclear", "text": "Ambient is 50 C.", "expected": {"ambient_above_derating_temp": "unclear"}}
+{"id": "ambient_55_yes", "text": "Ambient is about 55 C.", "expected": {"ambient_above_derating_temp": "yes"}}
+{"id": "ambient_51_yes", "text": "Room ambient is 51c near the enclosure.", "expected": {"ambient_above_derating_temp": "yes"}}
+{"id": "ambient_122f_yes", "text": "Ambient is 130 F.", "expected": {"ambient_above_derating_temp": "yes"}}
+{"id": "ambient_70f_no", "text": "Ambient around 70 F.", "expected": {"ambient_above_derating_temp": "no"}}
+{"id": "temp_without_ambient_word", "text": "Motor winding is 90 C.", "expected": {}, "absent": ["ambient_above_derating_temp"]}
+{"id": "load_within_derated", "text": "Load is within the derated rating.", "expected": {"load_within_derated_capacity": "yes"}}
+{"id": "load_within_derated_capacity", "text": "Current stays within derated capacity.", "expected": {"load_within_derated_capacity": "yes"}}
+{"id": "full_load_in_heat", "text": "Running at full load in this heat.", "expected": {"load_within_derated_capacity": "no"}}
+{"id": "over_derated", "text": "Load is over the derated capacity.", "expected": {"load_within_derated_capacity": "no"}}
+{"id": "exceeds_derated", "text": "We exceed the derated load capacity right now.", "expected": {"load_within_derated_capacity": "no"}}
+{"id": "motor_matches_drive", "text": "Motor matches the drive.", "expected": {"motor_power_vs_drive": "within"}}
+{"id": "motor_and_drive_match", "text": "Motor and drive are matched.", "expected": {"motor_power_vs_drive": "within"}}
+{"id": "motor_within_drive", "text": "Motor is within the drive rating.", "expected": {"motor_power_vs_drive": "within"}}
+{"id": "motor_75_drive_55", "text": "Motor is 75 kW, drive is 55 kW.", "expected": {"motor_power_vs_drive": "exceeds"}}
+{"id": "motor_55_drive_75", "text": "Motor 55 kW and drive 75 kW.", "expected": {"motor_power_vs_drive": "within"}}
+{"id": "motor_equals_drive_kw", "text": "Motor is 55 kW, drive is 55 kW.", "expected": {"motor_power_vs_drive": "within"}}
+{"id": "motor_100hp_drive_50hp", "text": "Motor is 100 hp and the drive is 50 hp.", "expected": {"motor_power_vs_drive": "exceeds"}}
+{"id": "motor_40hp_drive_50hp", "text": "40 hp motor on a 50 hp drive.", "expected": {"motor_power_vs_drive": "within"}}
+{"id": "motor_exceeds_drive_words", "text": "Motor power exceeds the drive.", "expected": {"motor_power_vs_drive": "exceeds"}}
+{"id": "drive_too_small", "text": "Drive is too small for this motor.", "expected": {"motor_power_vs_drive": "exceeds"}}
+{"id": "messy_cooling_ok", "text": "yeah fan's ok, vents clear, heatsink pretty clean", "expected": {"fan_status": "normal", "airflow_obstruction": "none", "heatsink_condition": "clean"}}
+{"id": "messy_hot_and_full_load", "text": "ambient ~55C and we're at full load in this heat", "expected": {"ambient_above_derating_temp": "yes", "load_within_derated_capacity": "no"}}
+{"id": "messy_motor_drive", "text": "checked nameplates: motor 75kW / drive only 55kW", "expected": {"motor_power_vs_drive": "exceeds"}}
+{"id": "nothing_useful", "text": "I checked the panel and left.", "expected": {}, "absent": ["fan_status", "heatsink_condition", "airflow_obstruction"]}
+{"id": "percent_load_not_acs_field", "text": "Drive load is 95%.", "expected": {}, "absent": ["load_within_derated_capacity", "fan_status"]}
 {"id": "fan_normal_airflow_clear", "text": "Fan is normal and vents are clear.", "expected": {"fan_status": "normal", "airflow_obstruction": "none"}}
-{"id": "load_100_exact", "text": "Load percent reads 100%.", "expected": {"load_percent": 100}}
-{"id": "ambient_negative", "text": "Ambient is -5 C outside the cabinet intake.", "expected": {"ambient_temp_c": -5}}
+{"id": "dusty_heatsink_blocked_vents", "text": "Heatsink dusty and vents blocked.", "expected": {"heatsink_condition": "dusty", "airflow_obstruction": "blocked"}}
+{"id": "clean_path_and_heatsink", "text": "Airflow unobstructed and heatsink clean.", "expected": {"airflow_obstruction": "none", "heatsink_condition": "clean"}}
+{"id": "negation_no_blockage", "text": "No obstruction on the inlet vents.", "expected": {"airflow_obstruction": "none"}}
+{"id": "cabinet_clogged_not_airflow", "text": "Drive cabinet is clogged.", "expected": {}, "absent": ["airflow_obstruction"]}
