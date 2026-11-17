@@ -79,6 +79,44 @@ def test_fan_spinning_not_noisy_is_normal(
     assert result.extracted["fan_status"] == "normal"
 
 
+def test_fan_conflict_with_correction_takes_last_value(
+    parser: KeywordParser, acs580: FaultGraph
+) -> None:
+    result = parser.parse(
+        "fan is noisy, actually no, the fan is running fine",
+        acs580,
+        ["fan_status"],
+    )
+    assert result.extracted["fan_status"] == "normal"
+    assert "conflicting" not in result.notes.lower()
+
+
+def test_fan_conflict_without_correction_is_unclear(
+    parser: KeywordParser, acs580: FaultGraph
+) -> None:
+    raw = parser.parse(
+        "fan is noisy, the fan is running fine",
+        acs580,
+        ["fan_status"],
+    )
+    assert raw.extracted["fan_status"] == UNCLEAR
+    assert "conflicting" in raw.notes.lower()
+    parsed = validate_parse(raw, acs580)
+    assert parsed.unclear_fields == ["fan_status"]
+
+
+def test_fan_conflict_correction_variants(
+    parser: KeywordParser, acs580: FaultGraph
+) -> None:
+    for text in (
+        "Fan stopped. No wait, the fan is spinning.",
+        "Fan is dead. Correction: fan is running normally.",
+        "Fan not running. I mean the fan is fine.",
+    ):
+        result = parser.parse(text, acs580, ["fan_status"])
+        assert result.extracted["fan_status"] == "normal", text
+
+
 def test_heatsink_no_dust_is_clean(parser: KeywordParser, acs580: FaultGraph) -> None:
     result = parser.parse("Heatsink has no dust.", acs580, ["heatsink_condition"])
     assert result.extracted["heatsink_condition"] == "clean"

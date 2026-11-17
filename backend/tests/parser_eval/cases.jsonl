@@ -73,3 +73,8 @@
 {"id": "clean_path_and_heatsink", "text": "Airflow unobstructed and heatsink clean.", "expected": {"airflow_obstruction": "none", "heatsink_condition": "clean"}}
 {"id": "negation_no_blockage", "text": "No obstruction on the inlet vents.", "expected": {"airflow_obstruction": "none"}}
 {"id": "cabinet_clogged_not_airflow", "text": "Drive cabinet is clogged.", "expected": {}, "absent": ["airflow_obstruction"]}
+{"id": "fan_conflict_correction_actually", "text": "fan is noisy, actually no, the fan is running fine", "expected": {"fan_status": "normal"}}
+{"id": "fan_conflict_correction_no_wait", "text": "Fan stopped. No wait, the fan is spinning.", "expected": {"fan_status": "normal"}}
+{"id": "fan_conflict_correction_i_mean", "text": "Fan not running. I mean the fan is fine.", "expected": {"fan_status": "normal"}}
+{"id": "fan_conflict_unclear", "text": "fan is noisy, the fan is running fine", "expected": {"fan_status": "unclear"}}
+{"id": "fan_conflict_dead_then_correction", "text": "Fan is dead. Correction: fan is running normally.", "expected": {"fan_status": "normal"}}

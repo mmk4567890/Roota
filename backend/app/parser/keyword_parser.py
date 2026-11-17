@@ -84,6 +84,49 @@ _FAN_NOT_NOISY_UNCLEAR = (
     "Is it running normally, or not running?"
 )
 
+_FAN_CONFLICT_UNCLEAR = (
+    "Heard conflicting fan status in that observation. "
+    "Is the fan running normally, not running, or noisy?"
+)
+
+# Correction cues: when present after an earlier value, prefer the later value.
+_CORRECTION_RE = re.compile(
+    r"\b(?:actually|no\s+wait|correction|i\s+mean)\b",
+    re.IGNORECASE,
+)
+
+
+def _resolve_conflicting_values(
+    lower: str,
+    candidates: list[tuple[int, str]],
+    *,
+    conflict_note: str,
+    notes_parts: list[str],
+) -> str | None:
+    """Pick one value from positioned candidates, or unclear on unresolved conflict.
+
+    ``candidates`` are ``(start_index, value)`` in utterance order. Same value
+    repeated is fine. Distinct values with a correction cue after the first
+    take the last value after that cue; otherwise return ``unclear``.
+    """
+    if not candidates:
+        return None
+    ordered = sorted(candidates, key=lambda item: item[0])
+    distinct = list(dict.fromkeys(value for _, value in ordered))
+    if len(distinct) == 1:
+        return distinct[0]
+
+    first_pos = ordered[0][0]
+    for cue in _CORRECTION_RE.finditer(lower):
+        if cue.start() <= first_pos:
+            continue
+        later = [value for pos, value in ordered if pos >= cue.start()]
+        if later:
+            return later[-1]
+
+    notes_parts.append(conflict_note)
+    return UNCLEAR
+
 
 def _extract_fan_status(
     lower: str,
@@ -92,30 +135,79 @@ def _extract_fan_status(
 ) -> None:
     if "fan" not in lower:
         return
-    if re.search(r"not\s+running|stopped|dead|\bisn'?t\s+running|is\s+not\s+running", lower):
-        extracted["fan_status"] = "not_running"
-        return
 
-    not_noisy = bool(
-        re.search(r"not\s+noisy|isn'?t\s+noisy|no\s+noise|not\s+rattl|not\s+squeak", lower)
-    )
-    noisy = bool(re.search(r"\bnoisy\b|rattl|squeak", lower))
-    running = bool(re.search(r"running|spinning|fine|normal|ok\b", lower))
-
-    # "Not noisy" alone does not say the fan is operating — leave unclear unless
-    # the text also affirms running/spinning (or another normal cue).
-    if not_noisy:
-        if running:
-            extracted["fan_status"] = "normal"
-        else:
-            extracted["fan_status"] = UNCLEAR
-            notes_parts.append(_FAN_NOT_NOISY_UNCLEAR)
-        return
-    if noisy:
+    # Single finding: still turning but noisy (require "but" — not two clauses).
+    if re.search(
+        r"(?:running|spinning)\s+but\s+(?:noisy|rattl|squeak)"
+        r"|(?:noisy|rattl|squeak)\s+but\s+(?:still\s+)?(?:running|spinning)",
+        lower,
+    ):
         extracted["fan_status"] = "noisy"
         return
-    if running:
-        extracted["fan_status"] = "normal"
+
+    candidates: list[tuple[int, str]] = []
+    not_running_matches = list(
+        re.finditer(
+            r"not\s+running|stopped|dead|\bisn'?t\s+running|is\s+not\s+running",
+            lower,
+        )
+    )
+    for match in not_running_matches:
+        candidates.append((match.start(), "not_running"))
+
+    not_noisy_matches = list(
+        re.finditer(
+            r"not\s+noisy|isn'?t\s+noisy|no\s+noise|not\s+rattl|not\s+squeak",
+            lower,
+        )
+    )
+    noisy_matches = [
+        match
+        for match in re.finditer(r"\bnoisy\b|rattl|squeak", lower)
+        if not any(
+            not_noisy.start() <= match.start() < not_noisy.end()
+            for not_noisy in not_noisy_matches
+        )
+    ]
+    # Do not treat the "running" inside "not running" as a normal cue.
+    running_matches = [
+        match
+        for match in re.finditer(r"\b(?:running|spinning|fine|normal|ok)\b", lower)
+        if not any(
+            not_run.start() <= match.start() < not_run.end()
+            for not_run in not_running_matches
+        )
+    ]
+
+    for match in noisy_matches:
+        candidates.append((match.start(), "noisy"))
+
+    # "Not noisy" alone is unclear; with a running cue it means normal.
+    if (
+        not_noisy_matches
+        and not running_matches
+        and not noisy_matches
+        and not candidates
+    ):
+        extracted["fan_status"] = UNCLEAR
+        notes_parts.append(_FAN_NOT_NOISY_UNCLEAR)
+        return
+
+    if not_noisy_matches and running_matches:
+        pos = max(not_noisy_matches[-1].start(), running_matches[-1].start())
+        candidates.append((pos, "normal"))
+    elif running_matches and not not_noisy_matches:
+        for match in running_matches:
+            candidates.append((match.start(), "normal"))
+
+    resolved = _resolve_conflicting_values(
+        lower,
+        candidates,
+        conflict_note=_FAN_CONFLICT_UNCLEAR,
+        notes_parts=notes_parts,
+    )
+    if resolved is not None:
+        extracted["fan_status"] = resolved
 
 
 def _extract_airflow(lower: str, extracted: dict[str, object]) -> None:
