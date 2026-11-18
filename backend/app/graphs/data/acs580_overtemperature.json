@@ -1,7 +1,7 @@
 {
   "fault_id": "acs580_overtemperature",
   "equipment": "vfd",
-  "display_name": "ABB ACS580 drive overtemperature",
+  "display_name": "Overtemperature — ABB ACS580",
   "notes": "Source: ABB ACS580 standard control program firmware manual, 3AXD50000016097 Rev J (doc_id abb_acs580_fw). Pages are PDF page numbers; ABB's printed page numbers are PDF page + 2. Excluded on purpose: 4380/A4B1 Excess temperature difference (cause is motor cabling, a different isolation path), 4110 Control board temperature, 4981/4982 External temperature, 4991 Safe motor temperature.",
   "fault_codes": [
     "4210",
@@ -17,7 +17,7 @@
   "fields": [
     {
       "name": "fan_status",
-      "label": "Fan status",
+      "label": "Fan",
       "type": "enum",
       "values": [
         "normal",
@@ -26,10 +26,10 @@
         "unclear"
       ],
       "value_labels": {
-        "normal": "Normal",
+        "normal": "Running normally",
         "not_running": "Not running",
         "noisy": "Noisy",
-        "unclear": "Not sure"
+        "unclear": "Unsure"
       },
       "unit": null,
       "description": "Operation of the drive's cooling fan. On frame R6 and larger the drive also reports missing fan feedback as warning A581 Fan / fault 5080 Fan.",
@@ -47,9 +47,9 @@
       ],
       "value_labels": {
         "none": "Clear",
-        "partial": "Partly obstructed",
+        "partial": "Partly blocked",
         "blocked": "Blocked",
-        "unclear": "Not sure"
+        "unclear": "Unsure"
       },
       "unit": null,
       "description": "Whether the drive module's cooling air flow (inlet, outlet, cabinet air path) is obstructed.",
@@ -67,7 +67,7 @@
       "value_labels": {
         "clean": "Clean",
         "dusty": "Dusty",
-        "unclear": "Not sure"
+        "unclear": "Unsure"
       },
       "unit": null,
       "description": "Dust pick-up on the heatsink fins of the drive module and inside the cabinet.",
@@ -75,7 +75,7 @@
     },
     {
       "name": "ambient_above_derating_temp",
-      "label": "Ambient above derating temp",
+      "label": "Room temperature",
       "type": "enum",
       "values": [
         "yes",
@@ -83,9 +83,9 @@
         "unclear"
       ],
       "value_labels": {
-        "yes": "Yes",
-        "no": "No",
-        "unclear": "Not sure"
+        "yes": "Above the derating limit",
+        "no": "Below the derating limit",
+        "unclear": "Unsure"
       },
       "unit": null,
       "description": "Whether the ambient temperature exceeds the temperature above which the drive must be derated. The manual (fault 4290) gives 40 °C / 104 °F and 50 °C / 122 °F for IP21 frames and refers to the Hardware manual, chapter Technical data, section Derating, for the exact limit and for IP55 frames.",
@@ -93,7 +93,7 @@
     },
     {
       "name": "load_within_derated_capacity",
-      "label": "Load within derated capacity",
+      "label": "Load",
       "type": "enum",
       "values": [
         "yes",
@@ -101,9 +101,9 @@
         "unclear"
       ],
       "value_labels": {
-        "yes": "Yes",
-        "no": "No",
-        "unclear": "Not sure"
+        "yes": "Within the derated rating",
+        "no": "Over the derated rating",
+        "unclear": "Unsure"
       },
       "unit": null,
       "description": "Whether the drive's load current stays within its derated load capacity at the present ambient temperature (Hardware manual, Technical data, Derating).",
@@ -111,7 +111,7 @@
     },
     {
       "name": "motor_power_vs_drive",
-      "label": "Motor vs drive power",
+      "label": "Motor vs drive rating",
       "type": "enum",
       "values": [
         "within",
@@ -121,7 +121,7 @@
       "value_labels": {
         "within": "Within",
         "exceeds": "Exceeds",
-        "unclear": "Not sure"
+        "unclear": "Unsure"
       },
       "unit": null,
       "description": "Motor power compared with drive power, as the manual's 'Check motor power against drive power' step asks.",

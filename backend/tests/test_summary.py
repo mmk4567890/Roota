@@ -45,7 +45,7 @@ def test_build_summary_root_cause_and_observation_fact() -> None:
     assert summary.escalation_reason is None
     assert len(summary.facts) == 1
     assert summary.facts[0].field == "fan_status"
-    assert summary.facts[0].field_label == "Fan status"
+    assert summary.facts[0].field_label == "Fan"
     assert summary.facts[0].value == "not_running"
     assert summary.facts[0].value_label == "Not running"
     assert summary.facts[0].how == "observation"
@@ -57,7 +57,7 @@ def test_build_summary_root_cause_and_observation_fact() -> None:
     md = render_markdown(summary)
     assert "Cooling fan not operating" in md
     assert "typed observation" in md
-    assert "Fan status: Not running" in md
+    assert "Fan: Not running" in md
     assert "fan_status" not in md
     assert "not_running" not in md
 
@@ -139,7 +139,7 @@ def test_summary_form_vs_observation_and_markdown(client: TestClient) -> None:
     assert md.status_code == 200, md.text
     assert "text/markdown" in md.headers["content-type"]
     assert "Packer ACS580" in md.text
-    assert "Fan status" in md.text
+    assert "Fan: " in md.text
     assert "fan_status" not in md.text
 
 
@@ -255,8 +255,8 @@ def test_summary_escalation_names_inconclusive_fan(client: TestClient) -> None:
     assert summary["root_cause"] is None
     assert summary["escalation_reason"] is not None
     assert "Cooling fan not operating" in summary["escalation_reason"]
-    assert "Fan status: Noisy" in summary["escalation_reason"]
+    assert "Fan: Noisy" in summary["escalation_reason"]
     assert "fan_status" not in summary["escalation_reason"]
     assert any(c["status"] == "inconclusive" for c in summary["causes"])
     fan = next(c for c in summary["causes"] if c["cause_id"] == "cooling_fan_failure")
-    assert fan["because"] == ["Fan status: Noisy"]
+    assert fan["because"] == ["Fan: Noisy"]

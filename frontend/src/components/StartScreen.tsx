@@ -156,7 +156,7 @@ export function StartScreen({ onStarted }: StartScreenProps) {
             <option value="">— select —</option>
             {faults.map((fault) => (
               <option key={fault.fault_id} value={fault.fault_id}>
-                {problemLabel(fault)}
+                {fault.display_name}
               </option>
             ))}
           </select>
@@ -212,14 +212,6 @@ export function StartScreen({ onStarted }: StartScreenProps) {
       </form>
     </section>
   );
-}
-
-function problemLabel(fault: FaultInfo): string {
-  // Problem-first: short readable name with equipment brand when present.
-  if (fault.fault_id === "acs580_overtemperature") {
-    return "Overtemperature — ABB ACS580";
-  }
-  return fault.display_name;
 }
 
 function errorText(error: unknown, fallback: string): string {

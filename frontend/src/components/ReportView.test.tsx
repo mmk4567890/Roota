@@ -12,7 +12,7 @@ describe("ReportView", () => {
     vi.spyOn(api, "getSessionSummary").mockResolvedValue({
       session_id: "11111111-1111-1111-1111-111111111111",
       fault_id: "acs580_overtemperature",
-      display_name: "ABB ACS580 drive overtemperature",
+      display_name: "Overtemperature — ABB ACS580",
       equipment_label: "Line 3",
       status: "closed",
       started_at: "2026-01-01T12:00:00Z",

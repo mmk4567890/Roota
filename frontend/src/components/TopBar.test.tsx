@@ -11,7 +11,7 @@ describe("TopBar", () => {
     expect(screen.queryByText("ACTIVE")).toBeNull();
   });
 
-  it("shows equipment, fault codes, status, and session log control", () => {
+  it("shows the fault name, equipment, fault codes, status, and session log control", () => {
     const onOpenLog = vi.fn();
     render(
       <TopBar
@@ -24,6 +24,7 @@ describe("TopBar", () => {
       />,
     );
 
+    expect(screen.getByText(sampleFault.display_name)).toBeInTheDocument();
     expect(screen.getByText("Line 3 conveyor drive")).toBeInTheDocument();
     expect(screen.getByText(/OH · OT · OH1/)).toBeInTheDocument();
     expect(screen.getByText("ACTIVE")).toBeInTheDocument();

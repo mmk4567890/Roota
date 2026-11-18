@@ -26,8 +26,9 @@ export function TopBar({
         {fault ? (
           <div className="flex flex-wrap items-center justify-end gap-3">
             <div className="text-right">
+              <p className="text-14 text-hud-text">{fault.display_name}</p>
               {equipmentLabel ? (
-                <p className="text-14 text-hud-text">{equipmentLabel}</p>
+                <p className="text-12 text-hud-muted">{equipmentLabel}</p>
               ) : null}
               <p className="font-mono text-12 uppercase tracking-label text-hud-muted">
                 {fault.fault_codes.join(" · ")}

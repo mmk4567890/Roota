@@ -128,7 +128,9 @@ def build_summary(
 
 def render_markdown(summary: SessionSummary) -> str:
     lines: list[str] = [
-        f"# Session summary — {summary.display_name}",
+        f"# {summary.display_name}",
+        "",
+        "Session report",
         "",
         f"- **Session:** `{summary.session_id}`",
         f"- **Equipment:** {summary.equipment_label}",

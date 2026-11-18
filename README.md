@@ -97,7 +97,7 @@ Without the manual Roota still runs, but recommendations show no cited passages.
 
 ## Try it
 
-Start a session for **ABB ACS580 drive overtemperature**, then type observations such as:
+Start a session for **Overtemperature — ABB ACS580**, then type observations such as:
 
 1. `The cooling fan is not running.` → root cause: cooling fan failure.
 2. `Fan is spinning fine but the vents are packed with dust.` → continues; then `Heatsink fins are full of dust.` → blocked airflow / dusty heatsink.

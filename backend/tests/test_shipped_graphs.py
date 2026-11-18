@@ -177,7 +177,7 @@ def test_noisy_fan_escalates_when_everything_else_is_ruled_out(
     assert state.next_action.type == "escalate"
     assert state.next_action.cause_id == "cooling_fan_failure"
     assert "Cooling fan not operating" in state.next_action.message
-    assert "Fan status: Noisy" in state.next_action.message
+    assert "Fan: Noisy" in state.next_action.message
     assert "fan_status" not in state.next_action.message
 
 
@@ -595,3 +595,35 @@ def test_api_unclear_without_a_reason_keeps_the_generic_message(
     body = observed.json()
     assert body["parse"]["unclear_fields"] == ["fan_status"]
     assert body["message"] == UNCLEAR_MOVED_ON_MESSAGE
+
+
+def test_shipped_field_and_value_labels_read_plainly() -> None:
+    graph = load_graphs(DEFAULT_GRAPHS_DIR)["acs580_overtemperature"]
+    assert graph.display_name == "Overtemperature — ABB ACS580"
+    labels = {
+        field.name: (field.label, field.value_labels) for field in graph.fields
+    }
+    assert labels["fan_status"] == (
+        "Fan",
+        {"normal": "Running normally", "not_running": "Not running", "noisy": "Noisy", "unclear": "Unsure"},
+    )
+    assert labels["airflow_obstruction"] == (
+        "Air flow",
+        {"none": "Clear", "partial": "Partly blocked", "blocked": "Blocked", "unclear": "Unsure"},
+    )
+    assert labels["heatsink_condition"] == (
+        "Heatsink",
+        {"clean": "Clean", "dusty": "Dusty", "unclear": "Unsure"},
+    )
+    assert labels["ambient_above_derating_temp"] == (
+        "Room temperature",
+        {"yes": "Above the derating limit", "no": "Below the derating limit", "unclear": "Unsure"},
+    )
+    assert labels["load_within_derated_capacity"] == (
+        "Load",
+        {"yes": "Within the derated rating", "no": "Over the derated rating", "unclear": "Unsure"},
+    )
+    assert labels["motor_power_vs_drive"] == (
+        "Motor vs drive rating",
+        {"within": "Within", "exceeds": "Exceeds", "unclear": "Unsure"},
+    )
