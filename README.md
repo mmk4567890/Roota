@@ -109,7 +109,7 @@ Use the **quick-answer buttons** under each check (including **Not sure**) or th
 ## Testing
 
 ```bash
-# Backend — expect 304 passed, 3 skipped (live tests opt-in with --live)
+# Backend — expect 324 passed, 3 skipped (live tests opt-in with --live)
 cd backend
 python -X dev -m pytest -W error::DeprecationWarning -W error::ResourceWarning
 
