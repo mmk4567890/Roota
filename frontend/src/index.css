@@ -170,3 +170,15 @@
     print-color-adjust: exact;
   }
 }
+
+/* Keep browser-autofilled inputs on the dark theme. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill {
+  -webkit-text-fill-color: #ededed;
+  caret-color: #ededed;
+  -webkit-box-shadow: 0 0 0 1000px #0d0f12 inset;
+  box-shadow: 0 0 0 1000px #0d0f12 inset;
+  transition: background-color 9999s ease-out 0s;
+}
