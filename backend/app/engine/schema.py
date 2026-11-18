@@ -47,6 +47,13 @@ class FieldSpec(GraphModel):
     # Human labels for enum values (and optional boolean true/false). Keys must
     # match every declared value; the UI and report never show raw ids.
     value_labels: dict[str, str] | None = None
+    # Plain phrases for reports, e.g. "heatsink_condition": {"clean": "Heatsink
+    # was clean"}. Enum only; keys are every declared value except "unclear".
+    value_phrases: dict[str, str] | None = None
+    # What an "unclear" answer leaves open, e.g. "air flow not confirmed".
+    unsure_phrase: str | None = Field(default=None, min_length=1)
+    # What the technician was unsure about, e.g. "the air flow".
+    unsure_subject: str | None = Field(default=None, min_length=1)
     unit: str | None = None
     description: str
     ask: str
@@ -89,6 +96,9 @@ class Check(GraphModel):
     reason: str
     collects: list[str] = Field(min_length=1)
     source: Source
+    # What to recheck when this check was answered "unsure", e.g. "the air
+    # path through the cabinet".
+    recheck: str | None = Field(default=None, min_length=1)
 
 
 class Cause(GraphModel):
@@ -206,9 +216,33 @@ def _validate_field_spec(field: FieldSpec) -> None:
             raise ValueError(
                 f"enum field '{field.name}' value_labels must be non-empty for {blank}"
             )
+        if field.value_phrases is not None:
+            expected = [value for value in field.values if value != UNCLEAR]
+            missing = [value for value in expected if value not in field.value_phrases]
+            if missing:
+                raise ValueError(
+                    f"enum field '{field.name}' value_phrases missing entries for {missing}"
+                )
+            extra = [key for key in field.value_phrases if key not in expected]
+            if extra:
+                raise ValueError(
+                    f"enum field '{field.name}' value_phrases has unknown or unclear "
+                    f"values {extra}"
+                )
+            blank = [
+                key for key, phrase in field.value_phrases.items() if not phrase.strip()
+            ]
+            if blank:
+                raise ValueError(
+                    f"enum field '{field.name}' value_phrases must be non-empty for {blank}"
+                )
     else:
         if field.values is not None:
             raise ValueError(f"{field.type} field '{field.name}' must not declare values")
+        if field.value_phrases is not None:
+            raise ValueError(
+                f"{field.type} field '{field.name}' must not declare value_phrases"
+            )
         if field.value_labels is not None:
             raise ValueError(
                 f"{field.type} field '{field.name}' must not declare value_labels"

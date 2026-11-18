@@ -6,7 +6,6 @@ import {
   getSessionSummaryMarkdown,
   type SessionSummary,
 } from "../api";
-import { causeStatusLabel } from "../labels";
 import { ErrorBanner } from "./ErrorBanner";
 
 interface ReportViewProps {
@@ -183,11 +182,11 @@ function ReportBody({ summary }: { summary: SessionSummary }) {
           {summary.causes.map((cause) => (
             <li key={cause.cause_id} className="flex flex-wrap items-baseline gap-2">
               <span className="inline-block rounded-[3px] border border-black/20 px-1.5 py-0.5 text-12">
-                {causeStatusLabel(cause.status)}
+                {cause.status_label}
               </span>
               <span>{cause.name}</span>
-              {cause.because.length > 0 ? (
-                <span className="text-black/60">— {cause.because.join(", ")}</span>
+              {cause.reason ? (
+                <span className="text-black/60">— {cause.reason}</span>
               ) : null}
             </li>
           ))}

@@ -259,4 +259,85 @@ def test_summary_escalation_names_inconclusive_fan(client: TestClient) -> None:
     assert "fan_status" not in summary["escalation_reason"]
     assert any(c["status"] == "inconclusive" for c in summary["causes"])
     fan = next(c for c in summary["causes"] if c["cause_id"] == "cooling_fan_failure")
-    assert fan["because"] == ["Fan: Noisy"]
+    assert fan["status_label"] == "Inconclusive"
+    assert fan["reason"] == "Fan running but noisy"
+
+
+# --- Plain checklist reasons and "Not checked" ---
+
+
+def _shipped_summary(facts: dict[str, object]):
+    from app.engine.engine import evaluate
+    from app.graphs.loader import DEFAULT_GRAPHS_DIR, load_graphs
+    from app.summary import build_summary
+
+    graph = load_graphs(DEFAULT_GRAPHS_DIR)["acs580_overtemperature"]
+    state = evaluate(graph, facts)
+    return build_summary(
+        session_id=uuid4(),
+        equipment_label="Line 1",
+        started_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        graph=graph,
+        events=[],
+        state=state,
+    )
+
+
+def _by_id(summary):
+    return {cause.cause_id: cause for cause in summary.causes}
+
+
+def test_causes_never_evaluated_after_a_root_cause_are_not_checked() -> None:
+    summary = _shipped_summary({"fan_status": "not_running"})
+    causes = _by_id(summary)
+    assert causes["cooling_fan_failure"].status_label == "Confirmed"
+    assert causes["cooling_fan_failure"].reason == "Fan not running"
+    for cause_id in ("blocked_airflow", "load_above_derated_capacity", "motor_exceeds_drive_power"):
+        assert causes[cause_id].status == "open"
+        assert causes[cause_id].status_label == "Not checked"
+        assert causes[cause_id].reason is None
+    md = render_markdown(summary)
+    assert "- **Not checked** · Motor power exceeds drive power" in md
+    assert "Open" not in md
+
+
+def test_open_causes_mid_session_stay_open() -> None:
+    summary = _shipped_summary({"fan_status": "normal"})
+    causes = _by_id(summary)
+    assert causes["blocked_airflow"].status_label == "Open"
+    assert causes["cooling_fan_failure"].reason == "Fan running normally"
+
+
+def test_checklist_reasons_name_the_specific_checks() -> None:
+    summary = _shipped_summary(
+        {
+            "fan_status": "normal",
+            "airflow_obstruction": "unclear",
+            "heatsink_condition": "clean",
+            "ambient_above_derating_temp": "yes",
+            "load_within_derated_capacity": "yes",
+            "motor_power_vs_drive": "within",
+        }
+    )
+    causes = _by_id(summary)
+    assert causes["blocked_airflow"].reason == (
+        "Heatsink was clean; air flow not confirmed (technician wasn't sure)"
+    )
+    assert causes["cooling_fan_failure"].reason == "Fan running normally"
+    assert causes["motor_exceeds_drive_power"].reason == (
+        "Motor rating is within the drive's rating"
+    )
+    assert causes["load_above_derated_capacity"].reason == (
+        "Room above the derating limit, but load within the derated rating"
+    )
+    checklist = render_markdown(summary).split("## Cause checklist")[1].split("\n## ")[0]
+    assert "Technician wasn't sure" not in checklist
+    assert ": Clean" not in checklist
+    assert "- **Inconclusive** · Obstructed cooling air flow or dusty heatsink — Heatsink was clean" in checklist
+
+
+def test_ruled_out_by_one_fact_names_only_that_check() -> None:
+    summary = _shipped_summary({"ambient_above_derating_temp": "no"})
+    assert _by_id(summary)["load_above_derated_capacity"].reason == (
+        "Room below the derating limit"
+    )

@@ -185,6 +185,16 @@ export interface CitationUsed {
   passage: string | null;
 }
 
+/** A cause as the report shows it: badge text plus one plain reason. */
+export interface SummaryCause {
+  cause_id: string;
+  name: string;
+  status: CauseStatusKind;
+  /** "Not checked" for causes still open once the session has an outcome. */
+  status_label: string;
+  reason: string | null;
+}
+
 export interface SessionSummary {
   session_id: string;
   fault_id: string;
@@ -193,7 +203,7 @@ export interface SessionSummary {
   status: SessionStatus;
   started_at: string;
   closed_at: string | null;
-  causes: CauseStatus[];
+  causes: SummaryCause[];
   root_cause: RootCauseSummary | null;
   escalation_reason: string | null;
   facts: FactReport[];

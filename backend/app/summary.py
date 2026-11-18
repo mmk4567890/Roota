@@ -12,19 +12,18 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-from app.engine.engine import UNCLEAR_REASON, CauseStatus, DiagnosticState
+from app.engine.engine import CauseStatus, DiagnosticState
 from app.engine.replay import is_event_undone, session_is_closed
 from app.engine.schema import (
-    UNCLEAR,
     FaultGraph,
     FieldSpec,
     Source,
     display_page,
     field_value_label,
-    format_fact,
 )
 from app.manuals import full_doc_citation, section_short_label, short_doc_name
 from app.models import Event
+from app.wording import cause_reason, cause_status_label
 
 
 class FactReport(BaseModel):
@@ -41,6 +40,20 @@ class FactReport(BaseModel):
     how: Literal["form", "observation"]
     text: str | None = None
     undone: bool = False
+
+
+class SummaryCause(BaseModel):
+    """A cause as the report shows it: badge text and one plain reason."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    cause_id: str
+    name: str
+    status: Literal["confirmed", "ruled_out", "contradiction", "open", "inconclusive"]
+    # "Not checked" for causes still open once the session has an outcome.
+    status_label: str
+    # None while nothing has decided the cause.
+    reason: str | None
 
 
 class RootCauseSummary(BaseModel):
@@ -78,7 +91,7 @@ class SessionSummary(BaseModel):
     status: Literal["active", "closed"]
     started_at: datetime
     closed_at: datetime | None
-    causes: list[CauseStatus]
+    causes: list[SummaryCause]
     root_cause: RootCauseSummary | None
     escalation_reason: str | None
     facts: list[FactReport]
@@ -118,7 +131,12 @@ def build_summary(
         status="closed" if closed else "active",
         started_at=started_at,
         closed_at=closed_at,
-        causes=_labeled_causes(graph, state.causes, state.facts),
+        causes=_summary_causes(
+            graph,
+            state.causes,
+            state.facts,
+            outcome_reached=closed or state.next_action.type in ("root_cause", "escalate"),
+        ),
         root_cause=root_cause,
         escalation_reason=escalation_reason,
         facts=_fact_reports(events, graph),
@@ -168,11 +186,10 @@ def render_markdown(summary: SessionSummary) -> str:
     else:
         lines.extend(["## Outcome", "", "Session still in progress.", ""])
 
-    lines.extend(["## Cause statuses", ""])
+    lines.extend(["## Cause checklist", ""])
     for cause in summary.causes:
-        status_label = _cause_status_label(cause.status)
-        because = f" — {', '.join(cause.because)}" if cause.because else ""
-        lines.append(f"- **{cause.name}**: {status_label}{because}")
+        reason = f" — {cause.reason}" if cause.reason else ""
+        lines.append(f"- **{cause.status_label}** · {cause.name}{reason}")
     lines.append("")
 
     lines.extend(["## Facts reported", ""])
@@ -212,37 +229,20 @@ def _field_spec(graph: FaultGraph, field_name: str) -> FieldSpec | None:
     return next((field for field in graph.fields if field.name == field_name), None)
 
 
-def _because_labels(
-    graph: FaultGraph,
-    because: list[str],
-    facts: dict[str, Any],
-) -> list[str]:
-    """User-facing reasons: ``Fan status: Noisy`` or unclear wording."""
-    labels: list[str] = []
-    for name in because:
-        spec = _field_spec(graph, name)
-        if spec is None:
-            labels.append(name)
-            continue
-        if name not in facts:
-            labels.append(spec.label)
-            continue
-        value = facts[name]
-        if value == UNCLEAR:
-            labels.append(UNCLEAR_REASON)
-        else:
-            labels.append(format_fact(spec, value))
-    return labels
-
-
-def _labeled_causes(
+def _summary_causes(
     graph: FaultGraph,
     causes: list[CauseStatus],
     facts: dict[str, Any],
-) -> list[CauseStatus]:
+    *,
+    outcome_reached: bool,
+) -> list[SummaryCause]:
     return [
-        cause.model_copy(
-            update={"because": _because_labels(graph, cause.because, facts)}
+        SummaryCause(
+            cause_id=cause.cause_id,
+            name=cause.name,
+            status=cause.status,
+            status_label=cause_status_label(cause.status, outcome_reached=outcome_reached),
+            reason=cause_reason(graph, cause, facts),
         )
         for cause in causes
     ]
@@ -380,16 +380,6 @@ def _format_source(source: Source) -> str:
         f"Source: {short_doc_name(source.doc_id)} · "
         f"{section_short_label(source.section)}{page_bit}"
     )
-
-
-def _cause_status_label(status: str) -> str:
-    return {
-        "confirmed": "Confirmed",
-        "ruled_out": "Ruled out",
-        "contradiction": "Contradiction",
-        "open": "Open",
-        "inconclusive": "Inconclusive",
-    }.get(status, status.replace("_", " ").title())
 
 
 def with_citation_passages(

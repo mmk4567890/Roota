@@ -22,8 +22,15 @@ describe("ReportView", () => {
           cause_id: "cooling_fan_failure",
           name: "Cooling fan not operating",
           status: "confirmed",
-          because: ["Fan status"],
-          promoted: false,
+          status_label: "Confirmed",
+          reason: "Fan not running",
+        },
+        {
+          cause_id: "blocked_airflow",
+          name: "Obstructed cooling air flow or dusty heatsink",
+          status: "open",
+          status_label: "Not checked",
+          reason: null,
         },
       ],
       root_cause: {
@@ -82,6 +89,9 @@ describe("ReportView", () => {
       ).toBeGreaterThan(0),
     );
     expect(screen.getByText("Confirmed")).toBeInTheDocument();
+    expect(screen.getByText(/Fan not running/)).toBeInTheDocument();
+    expect(screen.getByText("Not checked")).toBeInTheDocument();
+    expect(screen.queryByText("Open")).toBeNull();
     expect(screen.getByText(/Fan status: Not running/)).toBeInTheDocument();
     expect(screen.queryByText("[x]")).toBeNull();
     expect(screen.queryByText("fan_status")).toBeNull();

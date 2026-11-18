@@ -385,3 +385,55 @@ def test_sample_load_promotion_redirects_without_confirming() -> None:
     assert excessive_load.promote_when is not None
     assert excessive_load.promote_when != excessive_load.confirmed_when
     assert excessive_load.checks == ["check_load_level", "check_load_duty_cycle"]
+
+
+def _with_phrases(phrases: dict[str, str]) -> dict[str, Any]:
+    payload = _minimal_graph()
+    payload["fields"][0]["value_phrases"] = phrases
+    return payload
+
+
+def test_accepts_value_phrases_for_every_non_unclear_value() -> None:
+    values = [v for v in _minimal_graph()["fields"][0]["values"] if v != "unclear"]
+    graph = FaultGraph.model_validate(_with_phrases({v: f"Fan {v}" for v in values}))
+    assert graph.fields[0].value_phrases is not None
+
+
+def test_rejects_value_phrases_missing_a_value() -> None:
+    values = [v for v in _minimal_graph()["fields"][0]["values"] if v != "unclear"]
+    phrases = {v: f"Fan {v}" for v in values[1:]}
+    with pytest.raises(ValidationError, match="value_phrases missing entries"):
+        FaultGraph.model_validate(_with_phrases(phrases))
+
+
+def test_rejects_a_value_phrase_for_unclear() -> None:
+    values = [v for v in _minimal_graph()["fields"][0]["values"]]
+    with pytest.raises(ValidationError, match="unknown or unclear values"):
+        FaultGraph.model_validate(_with_phrases({v: f"Fan {v}" for v in values}))
+
+
+def test_rejects_value_phrases_on_a_number_field() -> None:
+    payload = _minimal_graph()
+    payload["fields"].append(
+        {
+            "name": "load_percent",
+            "label": "Load",
+            "type": "number",
+            "value_phrases": {"90": "Load high"},
+            "description": "Load",
+            "ask": "Load?",
+        }
+    )
+    with pytest.raises(ValidationError, match="must not declare value_phrases"):
+        FaultGraph.model_validate(payload)
+
+
+def test_rejects_an_empty_unsure_phrase_and_recheck() -> None:
+    payload = _minimal_graph()
+    payload["fields"][0]["unsure_phrase"] = ""
+    with pytest.raises(ValidationError, match="unsure_phrase"):
+        FaultGraph.model_validate(payload)
+    payload = _minimal_graph()
+    payload["checks"][0]["recheck"] = ""
+    with pytest.raises(ValidationError, match="recheck"):
+        FaultGraph.model_validate(payload)

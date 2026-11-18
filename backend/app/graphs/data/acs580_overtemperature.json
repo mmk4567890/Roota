@@ -31,6 +31,13 @@
         "noisy": "Noisy",
         "unclear": "Unsure"
       },
+      "value_phrases": {
+        "normal": "Fan running normally",
+        "not_running": "Fan not running",
+        "noisy": "Fan running but noisy"
+      },
+      "unsure_phrase": "fan operation not confirmed",
+      "unsure_subject": "the fan",
       "unit": null,
       "description": "Operation of the drive's cooling fan. On frame R6 and larger the drive also reports missing fan feedback as warning A581 Fan / fault 5080 Fan.",
       "ask": "Is the drive's cooling fan running normally, not running, or running but noisy?"
@@ -51,6 +58,13 @@
         "blocked": "Blocked",
         "unclear": "Unsure"
       },
+      "value_phrases": {
+        "none": "Air flow clear",
+        "partial": "Air flow partly blocked",
+        "blocked": "Air flow blocked"
+      },
+      "unsure_phrase": "air flow not confirmed",
+      "unsure_subject": "the air flow",
       "unit": null,
       "description": "Whether the drive module's cooling air flow (inlet, outlet, cabinet air path) is obstructed.",
       "ask": "Is the drive's cooling air path clear, partly obstructed, or blocked?"
@@ -69,6 +83,12 @@
         "dusty": "Dusty",
         "unclear": "Unsure"
       },
+      "value_phrases": {
+        "clean": "Heatsink was clean",
+        "dusty": "Heatsink was dusty"
+      },
+      "unsure_phrase": "heatsink condition not confirmed",
+      "unsure_subject": "the heatsink",
       "unit": null,
       "description": "Dust pick-up on the heatsink fins of the drive module and inside the cabinet.",
       "ask": "Are the heatsink fins (and the inside of the cabinet) clean, or is there dust pick-up?"
@@ -87,6 +107,12 @@
         "no": "Below the derating limit",
         "unclear": "Unsure"
       },
+      "value_phrases": {
+        "yes": "Room above the derating limit",
+        "no": "Room below the derating limit"
+      },
+      "unsure_phrase": "room temperature against the derating limit not confirmed",
+      "unsure_subject": "the room temperature",
       "unit": null,
       "description": "Whether the ambient temperature exceeds the temperature above which the drive must be derated. The manual (fault 4290) gives 40 °C / 104 °F and 50 °C / 122 °F for IP21 frames and refers to the Hardware manual, chapter Technical data, section Derating, for the exact limit and for IP55 frames.",
       "ask": "Is the ambient temperature above the drive's derating temperature (40 °C / 104 °F or 50 °C / 122 °F depending on IP21 frame; see the Derating section of the hardware manual)?"
@@ -105,6 +131,12 @@
         "no": "Over the derated rating",
         "unclear": "Unsure"
       },
+      "value_phrases": {
+        "yes": "Load within the derated rating",
+        "no": "Load over the derated rating"
+      },
+      "unsure_phrase": "load against the derated rating not confirmed",
+      "unsure_subject": "the load",
       "unit": null,
       "description": "Whether the drive's load current stays within its derated load capacity at the present ambient temperature (Hardware manual, Technical data, Derating).",
       "ask": "At this ambient temperature, does the load current stay within the drive's derated load capacity?"
@@ -123,6 +155,12 @@
         "exceeds": "Exceeds",
         "unclear": "Unsure"
       },
+      "value_phrases": {
+        "within": "Motor rating is within the drive's rating",
+        "exceeds": "Motor rating exceeds the drive's rating"
+      },
+      "unsure_phrase": "motor rating against the drive's rating not confirmed",
+      "unsure_subject": "the motor rating",
       "unit": null,
       "description": "Motor power compared with drive power, as the manual's 'Check motor power against drive power' step asks.",
       "ask": "Compared with the drive's power rating, is the motor's power within it or does it exceed it?"
@@ -141,7 +179,8 @@
         "section": "Fault tracing: 4210 IGBT overtemperature (printed p. 556)",
         "page": 554,
         "printed_page": 556
-      }
+      },
+      "recheck": "the cooling fan's operation"
     },
     {
       "id": "check_airflow_path",
@@ -155,7 +194,8 @@
         "section": "Fault tracing: 4290 Cooling (printed p. 557)",
         "page": 555,
         "printed_page": 557
-      }
+      },
+      "recheck": "the air path through the cabinet"
     },
     {
       "id": "check_heatsink_cleanliness",
@@ -169,7 +209,8 @@
         "section": "Fault tracing: 4210 IGBT overtemperature (printed p. 556)",
         "page": 554,
         "printed_page": 556
-      }
+      },
+      "recheck": "the heatsink fins and the inside of the cabinet"
     },
     {
       "id": "check_ambient_temperature",
@@ -183,7 +224,8 @@
         "section": "Fault tracing: 4290 Cooling (printed p. 557)",
         "page": 555,
         "printed_page": 557
-      }
+      },
+      "recheck": "the ambient temperature at the drive"
     },
     {
       "id": "check_derated_load",
@@ -197,7 +239,8 @@
         "section": "Fault tracing: 4290 Cooling (printed p. 557)",
         "page": 555,
         "printed_page": 557
-      }
+      },
+      "recheck": "the load current against the derated rating"
     },
     {
       "id": "check_motor_vs_drive_power",
@@ -211,7 +254,8 @@
         "section": "Fault tracing: 4210 IGBT overtemperature (printed p. 556)",
         "page": 554,
         "printed_page": 556
-      }
+      },
+      "recheck": "the motor's and the drive's power ratings"
     }
   ],
   "causes": [

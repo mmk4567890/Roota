@@ -401,8 +401,7 @@ def test_escalation_reason_never_contains_raw_field_ids(acs580: FaultGraph) -> N
         assert name not in summary.escalation_reason
         assert name not in render_markdown(summary)
         for cause in summary.causes:
-            for bit in cause.because:
-                assert name not in bit
+            assert name not in (cause.reason or "")
 
 
 # --- offline parsing and the API ---
@@ -627,3 +626,13 @@ def test_shipped_field_and_value_labels_read_plainly() -> None:
         "Motor vs drive rating",
         {"within": "Within", "exceeds": "Exceeds", "unclear": "Unsure"},
     )
+
+
+def test_shipped_graph_has_report_wording_for_every_field_and_check() -> None:
+    graph = load_graphs(DEFAULT_GRAPHS_DIR)["acs580_overtemperature"]
+    for field in graph.fields:
+        assert field.value_phrases, field.name
+        assert field.unsure_phrase, field.name
+        assert field.unsure_subject, field.name
+    for check in graph.checks:
+        assert check.recheck, check.id
