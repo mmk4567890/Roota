@@ -109,14 +109,14 @@ Use the **quick-answer buttons** under each check (including **Not sure**) or th
 ## Testing
 
 ```bash
-# Backend — expect 282 passed, 3 skipped (live tests opt-in with --live)
+# Backend — expect 300 passed, 3 skipped (live tests opt-in with --live)
 cd backend
 python -X dev -m pytest -W error::DeprecationWarning -W error::ResourceWarning
 
 # Keyword parser eval against the shipped ACS580 graph — 80/80 cases, 93/93 fields
 python scripts/eval_parser.py --parser keyword
 
-# Frontend — expect 30 passed; also type-check + production build
+# Frontend — expect 42 passed; also type-check + production build
 cd frontend
 npm test
 npm run build
