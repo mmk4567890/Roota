@@ -117,8 +117,10 @@
   }
 }
 
+/* On screen the report keeps the dark HUD; paper gets black on white. */
 @media print {
-  body {
+  body,
+  .hud-glow {
     background: white !important;
     color: black !important;
   }
@@ -131,6 +133,13 @@
     display: block !important;
   }
 
+  .report-overlay {
+    position: static !important;
+    overflow: visible !important;
+    background: white !important;
+    color: black !important;
+  }
+
   #session-report,
   .session-report {
     border: none !important;
@@ -140,7 +149,13 @@
     color: black !important;
   }
 
-  .summary-print-body {
+  .session-report * {
+    color: black !important;
+    background: transparent !important;
+    border-color: rgba(0, 0, 0, 0.25) !important;
+  }
+
+  .report-cause {
     break-inside: avoid;
   }
 }

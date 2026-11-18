@@ -17,5 +17,7 @@ export default defineConfig({
     globals: true,
     environment: "jsdom",
     setupFiles: "./src/test/setup.ts",
+    // Lets tests read the stylesheet (index.css?raw) to check the print rules.
+    css: { include: [/src\/index\.css/] },
   },
 });

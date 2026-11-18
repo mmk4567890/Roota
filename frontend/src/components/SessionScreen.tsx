@@ -180,7 +180,11 @@ export function SessionScreen({
         </div>
       ) : null}
 
-      <div className="mx-auto grid max-w-content gap-6 px-4 py-6 sm:px-6 min-[900px]:grid-cols-[220px_minmax(0,1fr)]">
+      <div
+        className={`mx-auto grid max-w-content gap-6 px-4 py-6 sm:px-6 min-[900px]:grid-cols-[220px_minmax(0,1fr)]${
+          reportOpen ? " no-print" : ""
+        }`}
+      >
         <aside className="order-2 min-[900px]:order-1 min-[900px]:pt-2">
           <CauseRail
             causes={session.state.causes}

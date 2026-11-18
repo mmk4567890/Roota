@@ -82,56 +82,60 @@ export function ReportView({ sessionId, onClose }: ReportViewProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-white text-black">
-      <div className="no-print sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 border-b border-black/10 bg-white px-4 py-3">
-        <p className="font-mono text-12 uppercase tracking-label text-black/60">
-          Session report
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 rounded-[4px] border border-black/20 px-3 py-1.5 text-14 disabled:opacity-40"
-            disabled={!markdown}
-            onClick={() => void copyMarkdown()}
-          >
-            <Copy className="h-4 w-4" aria-hidden />
-            {copied ? "Copied" : "Copy"}
-          </button>
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 rounded-[4px] border border-black/20 px-3 py-1.5 text-14 disabled:opacity-40"
-            disabled={!markdown}
-            onClick={downloadMarkdown}
-          >
-            <Download className="h-4 w-4" aria-hidden />
-            Download
-          </button>
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 rounded-[4px] border border-black/20 px-3 py-1.5 text-14"
-            onClick={() => window.print()}
-          >
-            <Printer className="h-4 w-4" aria-hidden />
-            Print / Save as PDF
-          </button>
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 rounded-[4px] border border-black/20 px-3 py-1.5 text-14"
-            onClick={onClose}
-            aria-label="Close report"
-          >
-            <X className="h-4 w-4" aria-hidden />
-            Close
-          </button>
+    <div className="report-overlay fixed inset-0 z-50 overflow-y-auto bg-hud-bg text-hud-text">
+      <div className="no-print sticky top-0 z-10 border-b border-white/10 bg-hud-bg">
+        <div className="mx-auto flex max-w-content flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-6">
+          <p className="hud-mono-tag">Session report</p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="hud-button"
+              disabled={!markdown}
+              onClick={() => void copyMarkdown()}
+            >
+              <Copy className="h-4 w-4" aria-hidden />
+              {copied ? "Copied" : "Copy"}
+            </button>
+            <button
+              type="button"
+              className="hud-button"
+              disabled={!markdown}
+              onClick={downloadMarkdown}
+            >
+              <Download className="h-4 w-4" aria-hidden />
+              Download
+            </button>
+            <button
+              type="button"
+              className="hud-button"
+              onClick={() => window.print()}
+            >
+              <Printer className="h-4 w-4" aria-hidden />
+              Print / Save as PDF
+            </button>
+            <button
+              type="button"
+              className="hud-button"
+              onClick={onClose}
+              aria-label="Close report"
+            >
+              <X className="h-4 w-4" aria-hidden />
+              Close
+            </button>
+          </div>
         </div>
       </div>
 
       <article
         id="session-report"
-        className="session-report mx-auto max-w-content px-6 py-8 summary-print-body"
+        className="session-report mx-auto max-w-content px-4 py-8 sm:px-6 summary-print-body"
       >
         {error ? <ErrorBanner message={error} /> : null}
-        {busy ? <p className="text-14 text-black/60">Loading report…</p> : null}
+        {busy ? (
+          <p className="text-14 text-hud-muted" role="status">
+            Loading report…
+          </p>
+        ) : null}
         {summary ? <ReportBody summary={summary} /> : null}
       </article>
     </div>
@@ -140,19 +144,19 @@ export function ReportView({ sessionId, onClose }: ReportViewProps) {
 
 function ReportBody({ summary }: { summary: SessionSummary }) {
   return (
-    <div className="space-y-8 text-[15px] leading-relaxed text-black">
+    <div className="space-y-8 text-[15px] leading-relaxed text-hud-text">
       <header>
-        <h1 className="text-2xl font-normal tracking-wide">
+        <h1 className="hud-display text-32">
           {summary.display_name}
         </h1>
-        <p className="mt-1 text-black/70">
+        <p className="mt-1 text-hud-muted">
           {summary.equipment_label}
           {summary.status === "closed" ? " · Closed" : ""}
         </p>
       </header>
 
       <section>
-        <h2 className="mb-2 text-lg font-medium">Outcome</h2>
+        <h2 className="hud-mono-tag mb-3">Outcome</h2>
         {summary.outcome ? (
           <div className="space-y-2">
             {summary.outcome.map((paragraph) => (
@@ -165,26 +169,31 @@ function ReportBody({ summary }: { summary: SessionSummary }) {
       </section>
 
       <section>
-        <h2 className="mb-2 text-lg font-medium">Cause checklist</h2>
-        <ul className="space-y-2">
+        <h2 className="hud-mono-tag mb-3">Cause checklist</h2>
+        <ul className="space-y-3">
           {summary.causes.map((cause) => (
-            <li key={cause.cause_id} className="flex flex-wrap items-baseline gap-2">
-              <span className="inline-block rounded-[3px] border border-black/20 px-1.5 py-0.5 text-12">
+            <li
+              key={cause.cause_id}
+              className="report-cause grid grid-cols-[7rem_minmax(0,1fr)] items-start gap-x-3"
+            >
+              <span className="report-badge inline-block whitespace-nowrap rounded-[3px] border border-white/16 px-1.5 py-0.5 text-center text-12 text-hud-muted">
                 {cause.status_label}
               </span>
-              <span>{cause.name}</span>
-              {cause.reason ? (
-                <span className="text-black/60">— {cause.reason}</span>
-              ) : null}
+              <div className="min-w-0">
+                <p className="text-hud-text">{cause.name}</p>
+                {cause.reason ? (
+                  <p className="text-14 text-hud-muted">{cause.reason}</p>
+                ) : null}
+              </div>
             </li>
           ))}
         </ul>
       </section>
 
       <section>
-        <h2 className="mb-2 text-lg font-medium">Timeline</h2>
+        <h2 className="hud-mono-tag mb-3">Timeline</h2>
         {summary.facts.length === 0 ? (
-          <p className="text-black/60">No facts reported.</p>
+          <p className="text-hud-muted">No facts reported.</p>
         ) : (
           <ol className="space-y-2">
             {summary.facts.map((fact) => (
@@ -193,10 +202,10 @@ function ReportBody({ summary }: { summary: SessionSummary }) {
                   {fact.field_label}: {fact.value_label}
                 </span>
                 {fact.text ? (
-                  <span className="text-black/70"> — “{fact.text}”</span>
+                  <span className="text-hud-muted"> — “{fact.text}”</span>
                 ) : null}
                 {fact.undone ? (
-                  <span className="text-black/50"> (undone)</span>
+                  <span className="text-hud-faint"> (undone)</span>
                 ) : null}
               </li>
             ))}
@@ -205,9 +214,9 @@ function ReportBody({ summary }: { summary: SessionSummary }) {
       </section>
 
       <section>
-        <h2 className="mb-2 text-lg font-medium">Citations</h2>
+        <h2 className="hud-mono-tag mb-3">Citations</h2>
         {summary.citations.length === 0 ? (
-          <p className="text-black/60">No citations.</p>
+          <p className="text-hud-muted">No citations.</p>
         ) : (
           <ul className="space-y-3">
             {summary.citations.map((cite) => (
@@ -216,9 +225,9 @@ function ReportBody({ summary }: { summary: SessionSummary }) {
                   {cite.short_name} · {cite.section_label}
                   {cite.page != null ? ` · p. ${cite.page}` : ""}
                 </p>
-                <p className="text-black/60">{cite.full_title}</p>
+                <p className="text-hud-muted">{cite.full_title}</p>
                 {cite.passage ? (
-                  <blockquote className="mt-1 border-l-2 border-black/20 pl-3 text-black/80 whitespace-pre-wrap">
+                  <blockquote className="mt-1 border-l-2 border-white/16 pl-3 text-hud-text whitespace-pre-wrap">
                     {cite.passage}
                   </blockquote>
                 ) : null}
