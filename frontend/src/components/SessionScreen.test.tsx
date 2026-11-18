@@ -47,6 +47,32 @@ describe("SessionScreen", () => {
     expect(screen.getByText(/Fan status: Normal/)).toBeInTheDocument();
   });
 
+  it("shows the specific unclear reason from the API, not the generic line", async () => {
+    const message =
+      "You said the fan is noisy and running fine. " +
+      "Marked as not sure — moving to the next check.";
+    vi.spyOn(api, "reportObservation").mockResolvedValue(
+      makeObservationResponse({
+        parse: {
+          extracted: {},
+          unclear_fields: ["fan_status"],
+          rejected: [],
+          notes: "You said the fan is noisy and running fine.",
+        },
+        message,
+      }),
+    );
+    renderSession();
+
+    fireEvent.change(screen.getByLabelText("Or describe what you see"), {
+      target: { value: "Fan is noisy, fan is running fine" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Submit observation" }));
+
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(screen.queryByText(UNCLEAR_MOVED_ON_MESSAGE)).not.toBeInTheDocument();
+  });
+
   it("shows API errors without clearing the text box", async () => {
     vi.spyOn(api, "reportObservation").mockRejectedValue(
       new api.ApiError(502, "down", "Anthropic API call failed"),

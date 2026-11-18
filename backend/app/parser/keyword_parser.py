@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 
 from app.engine.schema import FaultGraph, UNCLEAR
 from app.parser.base import ParseResult
@@ -75,19 +76,42 @@ class KeywordParser:
             extracted=extracted,
             unclear_fields=[],
             rejected=[],
-            notes="; ".join(notes_parts),
+            notes=_join_notes(notes_parts),
         )
 
 
+def _join_notes(parts: list[str]) -> str:
+    """Join note parts as full sentences so they can lead a message."""
+    sentences = []
+    for part in parts:
+        text = part.strip()
+        if not text:
+            continue
+        if text[-1] not in ".?!":
+            text += "."
+        sentences.append(text[0].upper() + text[1:])
+    return " ".join(sentences)
+
+
 _FAN_NOT_NOISY_UNCLEAR = (
-    "Not being noisy doesn't tell us whether the fan is running. "
-    "Is it running normally, or not running?"
+    "Not being noisy doesn't tell us whether the fan is running."
 )
 
-_FAN_CONFLICT_UNCLEAR = (
-    "Heard conflicting fan status in that observation. "
-    "Is the fan running normally, not running, or noisy?"
-)
+# How each fan_status value reads in "You said the fan is ...".
+_FAN_STATUS_PHRASES = {
+    "normal": "running fine",
+    "not_running": "not running",
+    "noisy": "noisy",
+}
+
+
+def _fan_conflict_note(values: list[str]) -> str:
+    phrases = [_FAN_STATUS_PHRASES[value] for value in values]
+    if len(phrases) > 1:
+        said = ", ".join(phrases[:-1]) + " and " + phrases[-1]
+    else:
+        said = phrases[0]
+    return f"You said the fan is {said}."
 
 # Correction cues: when present after an earlier value, prefer the later value.
 _CORRECTION_RE = re.compile(
@@ -100,14 +124,15 @@ def _resolve_conflicting_values(
     lower: str,
     candidates: list[tuple[int, str]],
     *,
-    conflict_note: str,
+    conflict_note: Callable[[list[str]], str],
     notes_parts: list[str],
 ) -> str | None:
     """Pick one value from positioned candidates, or unclear on unresolved conflict.
 
     ``candidates`` are ``(start_index, value)`` in utterance order. Same value
     repeated is fine. Distinct values with a correction cue after the first
-    take the last value after that cue; otherwise return ``unclear``.
+    take the last value after that cue; otherwise return ``unclear`` and add
+    ``conflict_note(distinct_values)`` to the notes.
     """
     if not candidates:
         return None
@@ -124,7 +149,7 @@ def _resolve_conflicting_values(
         if later:
             return later[-1]
 
-    notes_parts.append(conflict_note)
+    notes_parts.append(conflict_note(distinct))
     return UNCLEAR
 
 
@@ -203,7 +228,7 @@ def _extract_fan_status(
     resolved = _resolve_conflicting_values(
         lower,
         candidates,
-        conflict_note=_FAN_CONFLICT_UNCLEAR,
+        conflict_note=_fan_conflict_note,
         notes_parts=notes_parts,
     )
     if resolved is not None:
@@ -322,8 +347,7 @@ def _extract_ambient(
         extracted["ambient_above_derating_temp"] = UNCLEAR
         notes_parts.append(
             f"{temp_c:g} °C is between the 40 °C and 50 °C derating limits, "
-            "so it depends on the drive's frame and IP rating "
-            "(see the hardware manual's Derating section)"
+            "so it depends on the drive's frame and IP rating"
         )
 
 

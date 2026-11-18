@@ -563,6 +563,8 @@ def _expected_fields_from_state(
 
 
 UNCLEAR_MOVED_ON_MESSAGE = "Marked as not sure. Moving to the next check."
+# Follows a specific reason, e.g. "45 °C is between ... Marked as not sure — ..."
+UNCLEAR_MOVED_ON_SUFFIX = "Marked as not sure — moving to the next check."
 
 
 def _observation_message(parsed: ParseResult) -> str | None:
@@ -579,11 +581,16 @@ def _observation_message(parsed: ParseResult) -> str | None:
             "I didn't understand any diagnostic field values in that observation. "
             "Please re-phrase using clearer measurements or statuses."
         )
-    # Unclear answers mark causes inconclusive and continue — tell the tech.
-    if parsed.unclear_fields:
-        return UNCLEAR_MOVED_ON_MESSAGE
     # Parser notes explain ambiguous values (e.g. ambient between derating limits).
     notes = parsed.notes.strip()
+    # Unclear answers mark causes inconclusive and continue — tell the tech
+    # why first, when the parser said why.
+    if parsed.unclear_fields:
+        if not notes:
+            return UNCLEAR_MOVED_ON_MESSAGE
+        if notes[-1] not in ".?!":
+            notes += "."
+        return f"{notes} {UNCLEAR_MOVED_ON_SUFFIX}"
     if notes:
         return notes
     return None

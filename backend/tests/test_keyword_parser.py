@@ -55,8 +55,9 @@ def test_fan_not_noisy_alone_is_unclear(
 ) -> None:
     raw = parser.parse("The fan is not noisy.", acs580, ["fan_status"])
     assert raw.extracted["fan_status"] == UNCLEAR
-    assert "whether the fan is running" in raw.notes
-    assert "running normally" in raw.notes
+    assert raw.notes == (
+        "Not being noisy doesn't tell us whether the fan is running."
+    )
     parsed = validate_parse(raw, acs580)
     assert "fan_status" not in parsed.extracted
     assert parsed.unclear_fields == ["fan_status"]
@@ -88,7 +89,7 @@ def test_fan_conflict_with_correction_takes_last_value(
         ["fan_status"],
     )
     assert result.extracted["fan_status"] == "normal"
-    assert "conflicting" not in result.notes.lower()
+    assert "you said" not in result.notes.lower()
 
 
 def test_fan_conflict_without_correction_is_unclear(
@@ -100,7 +101,7 @@ def test_fan_conflict_without_correction_is_unclear(
         ["fan_status"],
     )
     assert raw.extracted["fan_status"] == UNCLEAR
-    assert "conflicting" in raw.notes.lower()
+    assert raw.notes == "You said the fan is noisy and running fine."
     parsed = validate_parse(raw, acs580)
     assert parsed.unclear_fields == ["fan_status"]
 

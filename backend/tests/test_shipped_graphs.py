@@ -445,8 +445,6 @@ def test_api_session_on_the_real_graph(client: TestClient) -> None:
 
 
 def test_api_fan_not_noisy_alone_is_unclear_with_message(client: TestClient) -> None:
-    from app.routers.sessions import UNCLEAR_MOVED_ON_MESSAGE
-
     created = client.post(
         "/sessions",
         json={"fault_id": "acs580_overtemperature", "equipment_label": "Line 6 ACS580"},
@@ -462,9 +460,11 @@ def test_api_fan_not_noisy_alone_is_unclear_with_message(client: TestClient) -> 
     body = observed.json()
     assert body["parse"]["extracted"] == {}
     assert body["parse"]["unclear_fields"] == ["fan_status"]
-    # Parser still records the clarifying notes; the API surfaces the move-on message.
-    assert "whether the fan is running" in body["parse"]["notes"]
-    assert body["message"] == UNCLEAR_MOVED_ON_MESSAGE
+    # The specific reason comes first, then the move-on line.
+    assert body["message"] == (
+        "Not being noisy doesn't tell us whether the fan is running. "
+        "Marked as not sure — moving to the next check."
+    )
     assert body["state"]["facts"].get("fan_status") == "unclear"
     fan = next(
         c for c in body["state"]["causes"] if c["cause_id"] == "cooling_fan_failure"
@@ -503,11 +503,11 @@ def test_api_ambient_between_derating_limits_is_unclear_with_message(
     body = ambient.json()
     assert body["parse"]["extracted"] == {}
     assert body["parse"]["unclear_fields"] == ["ambient_above_derating_temp"]
-    from app.routers.sessions import UNCLEAR_MOVED_ON_MESSAGE
-
-    assert "45" in body["parse"]["notes"]
-    assert "derating" in body["parse"]["notes"].lower()
-    assert body["message"] == UNCLEAR_MOVED_ON_MESSAGE
+    assert body["message"] == (
+        "45 °C is between the 40 °C and 50 °C derating limits, so it depends "
+        "on the drive's frame and IP rating. "
+        "Marked as not sure — moving to the next check."
+    )
     assert body["state"]["facts"].get("ambient_above_derating_temp") == "unclear"
     load = next(
         c
@@ -530,3 +530,68 @@ def test_api_ambient_between_derating_limits_is_unclear_with_message(
     over_body = over.json()
     assert over_body["state"]["next_action"]["type"] == "root_cause"
     assert over_body["state"]["next_action"]["cause_id"] == "load_above_derated_capacity"
+
+
+def test_api_conflicting_fan_statements_lead_the_unclear_message(
+    client: TestClient,
+) -> None:
+    created = client.post(
+        "/sessions",
+        json={"fault_id": "acs580_overtemperature", "equipment_label": "Line 7 ACS580"},
+    )
+    assert created.status_code == 201, created.text
+    session_id = created.json()["id"]
+
+    observed = client.post(
+        f"/sessions/{session_id}/observations",
+        json={
+            "text": "The fan is noisy, the fan is running fine.",
+            "check_id": "check_fan_operation",
+        },
+    )
+    assert observed.status_code == 200, observed.text
+    body = observed.json()
+    assert body["parse"]["unclear_fields"] == ["fan_status"]
+    assert body["message"] == (
+        "You said the fan is noisy and running fine. "
+        "Marked as not sure — moving to the next check."
+    )
+    assert body["state"]["next_action"]["check"]["id"] == "check_airflow_path"
+
+
+def test_api_unclear_without_a_reason_keeps_the_generic_message(
+    client: TestClient,
+) -> None:
+    from app.main import app
+    from app.parser.base import ParseResult
+    from app.routers import sessions
+    from app.routers.sessions import UNCLEAR_MOVED_ON_MESSAGE
+
+    class ReasonlessUnclearParser:
+        def parse(
+            self, text: str, graph: FaultGraph, expected_fields: list[str]
+        ) -> ParseResult:
+            del text, graph, expected_fields
+            return ParseResult(
+                extracted={"fan_status": "unclear"},
+                unclear_fields=[],
+                rejected=[],
+                notes="",
+            )
+
+    app.dependency_overrides[sessions.get_parser] = lambda: ReasonlessUnclearParser()
+    created = client.post(
+        "/sessions",
+        json={"fault_id": "acs580_overtemperature", "equipment_label": "Line 8 ACS580"},
+    )
+    assert created.status_code == 201, created.text
+    session_id = created.json()["id"]
+
+    observed = client.post(
+        f"/sessions/{session_id}/observations",
+        json={"text": "Can't tell about the fan.", "check_id": "check_fan_operation"},
+    )
+    assert observed.status_code == 200, observed.text
+    body = observed.json()
+    assert body["parse"]["unclear_fields"] == ["fan_status"]
+    assert body["message"] == UNCLEAR_MOVED_ON_MESSAGE
