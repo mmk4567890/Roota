@@ -89,3 +89,26 @@ export function railStatusLabel(
   }
   return causeStatusLabel(status);
 }
+
+/** Dot colour per cause status, matching the HUD palette (tailwind hud.*). */
+const STATUS_DOT_COLORS: Record<string, string> = {
+  confirmed: "#4ADE80",
+  inconclusive: "#FBBF24",
+  contradiction: "#F87171",
+  ruled_out: "#5A5F68",
+  open: "#5A5F68",
+};
+
+/** Report badge look: a status dot, and a brighter border for Confirmed. */
+export function statusBadgeStyle(status: string): {
+  dotColor: string;
+  borderClass: string;
+} {
+  return {
+    dotColor: STATUS_DOT_COLORS[status] ?? STATUS_DOT_COLORS.open,
+    borderClass:
+      status === "confirmed"
+        ? "border-white/50 text-hud-text"
+        : "border-white/16 text-hud-muted",
+  };
+}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { Copy, Download, Printer, X } from "lucide-react";
 import {
   ApiError,
@@ -6,6 +6,7 @@ import {
   getSessionSummaryMarkdown,
   type SessionSummary,
 } from "../api";
+import { statusBadgeStyle } from "../labels";
 import { ErrorBanner } from "./ErrorBanner";
 
 interface ReportViewProps {
@@ -192,9 +193,7 @@ function ReportBody({ summary }: { summary: SessionSummary }) {
               key={cause.cause_id}
               className="report-cause grid grid-cols-[7rem_minmax(0,1fr)] items-start gap-x-3"
             >
-              <span className="report-badge inline-block whitespace-nowrap rounded-[3px] border border-white/16 px-1.5 py-0.5 text-center text-12 text-hud-muted">
-                {cause.status_label}
-              </span>
+              <StatusBadge status={cause.status} label={cause.status_label} />
               <div className="min-w-0">
                 <p className="text-hud-text">{cause.name}</p>
                 {cause.reason ? (
@@ -253,5 +252,23 @@ function ReportBody({ summary }: { summary: SessionSummary }) {
         )}
       </section>
     </div>
+  );
+}
+
+
+function StatusBadge({ status, label }: { status: string; label: string }) {
+  const { dotColor, borderClass } = statusBadgeStyle(status);
+  return (
+    <span
+      className={`report-badge inline-flex items-center gap-1.5 whitespace-nowrap rounded-[3px] border px-1.5 py-0.5 text-12 ${borderClass}`}
+      data-status={status}
+    >
+      <span
+        className="status-dot h-1.5 w-1.5 shrink-0 rounded-full"
+        style={{ "--status-dot": dotColor } as CSSProperties}
+        aria-hidden
+      />
+      {label}
+    </span>
   );
 }

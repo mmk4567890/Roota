@@ -104,6 +104,20 @@ describe("ReportView", () => {
     expect(screen.getByText(/Fan not running/)).toBeInTheDocument();
     expect(screen.getByText("Not checked")).toBeInTheDocument();
     expect(screen.queryByText("Open")).toBeNull();
+    const confirmed = screen.getByText("Confirmed").closest(".report-badge");
+    const notChecked = screen.getByText("Not checked").closest(".report-badge");
+    expect(confirmed).toHaveClass("border-white/50");
+    expect(notChecked).toHaveClass("border-white/16");
+    expect(
+      (confirmed?.querySelector(".status-dot") as HTMLElement).style.getPropertyValue(
+        "--status-dot",
+      ),
+    ).toBe("#4ADE80");
+    expect(
+      (notChecked?.querySelector(".status-dot") as HTMLElement).style.getPropertyValue(
+        "--status-dot",
+      ),
+    ).toBe("#5A5F68");
     expect(screen.getByText(/Fan status: Not running/)).toBeInTheDocument();
     expect(screen.queryByText("[x]")).toBeNull();
     expect(screen.queryByText("fan_status")).toBeNull();

@@ -73,6 +73,10 @@
     @apply font-display font-light tracking-display text-hud-text;
   }
 
+  .status-dot {
+    background-color: var(--status-dot);
+  }
+
   .corner-frame {
     position: relative;
   }
@@ -157,5 +161,12 @@
 
   .report-cause {
     break-inside: avoid;
+  }
+
+  /* Keep the status colours on paper (more specific than the rule above). */
+  .session-report .status-dot {
+    background: var(--status-dot) !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 }

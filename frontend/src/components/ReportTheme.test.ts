@@ -15,6 +15,7 @@ describe("report theme", () => {
     expect(print).toMatch(/\.report-overlay\s*\{[^}]*background:\s*white/);
     expect(print).toMatch(/\.session-report \*\s*\{[^}]*color:\s*black/);
     expect(print).toMatch(/\.no-print\s*\{[^}]*display:\s*none/);
+    expect(print).toMatch(/\.session-report \.status-dot\s*\{[^}]*var\(--status-dot\)/);
   });
 
   it("keeps the report in the dark HUD style on screen", () => {
