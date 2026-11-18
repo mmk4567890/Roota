@@ -23,7 +23,7 @@ from app.engine.schema import (
 )
 from app.manuals import full_doc_citation, section_short_label, short_doc_name
 from app.models import Event
-from app.wording import cause_reason, cause_status_label
+from app.wording import cause_reason, cause_status_label, outcome_paragraphs
 
 
 class FactReport(BaseModel):
@@ -93,7 +93,8 @@ class SessionSummary(BaseModel):
     closed_at: datetime | None
     causes: list[SummaryCause]
     root_cause: RootCauseSummary | None
-    escalation_reason: str | None
+    # Plain sentences for the root cause or escalation; None while in progress.
+    outcome: list[str] | None
     facts: list[FactReport]
     citations: list[CitationUsed]
 
@@ -111,7 +112,6 @@ def build_summary(
     closed_at = _closed_at(events) if closed else None
 
     root_cause: RootCauseSummary | None = None
-    escalation_reason: str | None = None
     if state.next_action.type == "root_cause" and state.next_action.cause_id:
         cause = next(c for c in graph.causes if c.id == state.next_action.cause_id)
         root_cause = RootCauseSummary(
@@ -120,8 +120,6 @@ def build_summary(
             corrective_action=cause.corrective_action,
             source=cause.action_source,
         )
-    elif state.next_action.type == "escalate":
-        escalation_reason = state.next_action.message
 
     return SessionSummary(
         session_id=session_id,
@@ -138,7 +136,7 @@ def build_summary(
             outcome_reached=closed or state.next_action.type in ("root_cause", "escalate"),
         ),
         root_cause=root_cause,
-        escalation_reason=escalation_reason,
+        outcome=outcome_paragraphs(graph, state),
         facts=_fact_reports(events, graph),
         citations=_citations_used(graph, state),
     )
@@ -160,31 +158,21 @@ def render_markdown(summary: SessionSummary) -> str:
         lines.append(f"- **Closed:** {summary.closed_at.isoformat()}")
     lines.append("")
 
-    if summary.root_cause is not None:
-        rc = summary.root_cause
-        lines.extend(
-            [
-                "## Root cause",
-                "",
-                f"**{rc.name}** (`{rc.cause_id}`)",
-                "",
-                rc.corrective_action,
-                "",
-                _format_source(rc.source),
-                "",
-            ]
-        )
-    elif summary.escalation_reason is not None:
-        lines.extend(
-            [
-                "## Escalation",
-                "",
-                summary.escalation_reason,
-                "",
-            ]
-        )
+    heading = (
+        "Root cause"
+        if summary.root_cause is not None
+        else "Escalation"
+        if summary.outcome is not None
+        else "Outcome"
+    )
+    lines.extend([f"## {heading}", ""])
+    if summary.outcome is not None:
+        for paragraph in summary.outcome:
+            lines.extend([paragraph, ""])
+    elif summary.status == "closed":
+        lines.extend(["Session closed without a diagnosis.", ""])
     else:
-        lines.extend(["## Outcome", "", "Session still in progress.", ""])
+        lines.extend(["Session still in progress.", ""])
 
     lines.extend(["## Cause checklist", ""])
     for cause in summary.causes:
@@ -371,15 +359,6 @@ def _closed_at(events: list[Event]) -> datetime | None:
         if event.type == "closed" and not is_event_undone(events, event.id):
             return event.created_at
     return None
-
-
-def _format_source(source: Source) -> str:
-    page = display_page(source)
-    page_bit = f", p. {page}" if page is not None else ""
-    return (
-        f"Source: {short_doc_name(source.doc_id)} · "
-        f"{section_short_label(source.section)}{page_bit}"
-    )
 
 
 def with_citation_passages(

@@ -362,7 +362,7 @@ def test_airflow_unclear_and_clean_heatsink_is_inconclusive(acs580: FaultGraph) 
     assert "airflow_obstruction" not in exhausted.next_action.message
 
 
-def test_escalation_reason_never_contains_raw_field_ids(acs580: FaultGraph) -> None:
+def test_escalation_outcome_never_contains_raw_field_ids(acs580: FaultGraph) -> None:
     """User-facing escalate / summary strings must use labels, not field ids."""
     from app.summary import build_summary, render_markdown
 
@@ -396,9 +396,9 @@ def test_escalation_reason_never_contains_raw_field_ids(acs580: FaultGraph) -> N
         events=[],
         state=state,
     )
-    assert summary.escalation_reason is not None
+    assert summary.outcome is not None
     for name in field_names:
-        assert name not in summary.escalation_reason
+        assert name not in " ".join(summary.outcome)
         assert name not in render_markdown(summary)
         for cause in summary.causes:
             assert name not in (cause.reason or "")

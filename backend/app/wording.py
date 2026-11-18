@@ -1,4 +1,4 @@
-"""Plain-language wording for cause statuses and reasons.
+"""Plain-language wording for cause statuses, reasons and outcomes.
 
 Pure functions over a fault graph and an engine result — no I/O, no LLM. The
 words come from the graph (``value_phrases``, ``unsure_phrase``); this module
@@ -10,18 +10,22 @@ from __future__ import annotations
 from collections.abc import Iterator
 from typing import Any
 
-from app.engine.engine import CauseStatus, Truth, evaluate_condition
+from app.engine.engine import CauseStatus, DiagnosticState, Truth, evaluate_condition
 from app.engine.schema import (
     UNCLEAR,
     AllCondition,
     AnyCondition,
     Cause,
+    Check,
     Condition,
     FaultGraph,
     FieldCondition,
     FieldSpec,
+    Source,
+    display_page,
     format_fact,
 )
+from app.manuals import section_short_label, short_doc_name
 
 UNSURE_NOTE = "(technician wasn't sure)"
 NOT_CHECKED = "Not checked"
@@ -134,3 +138,181 @@ def _upper_first(text: str) -> str:
 
 def _lower_first(text: str) -> str:
     return text[:1].lower() + text[1:]
+
+
+# --- Outcome text ---------------------------------------------------------
+
+ESCALATE = "Escalate to a senior technician or OEM support"
+
+_NUMBER_WORDS = (
+    "zero", "one", "two", "three", "four", "five",
+    "six", "seven", "eight", "nine", "ten",
+)
+
+
+def outcome_paragraphs(graph: FaultGraph, state: DiagnosticState) -> list[str] | None:
+    """Short readable sentences for a root cause or an escalation.
+
+    ``None`` while the engine still has a check to ask.
+    """
+    action = state.next_action
+    if action.type == "root_cause" and action.cause_id is not None:
+        return _root_cause_paragraphs(graph, state, action.cause_id)
+    if action.type == "escalate":
+        return _escalation_paragraphs(graph, state)
+    return None
+
+
+def _root_cause_paragraphs(
+    graph: FaultGraph, state: DiagnosticState, cause_id: str
+) -> list[str]:
+    cause = _graph_cause(graph, cause_id)
+    first = (
+        f"Root cause found: {_sentence_body(cause.name)}. "
+        f"{_sentence(cause.corrective_action)} "
+        f"Source: {_citation(cause.action_source)}."
+    )
+    others = [item for item in state.causes if item.cause_id != cause_id]
+    paragraphs = [first]
+    if others:
+        paragraphs.append(_other_causes_sentence(others))
+    return paragraphs
+
+
+def _other_causes_sentence(others: list[CauseStatus]) -> str:
+    groups = [
+        (sum(1 for item in others if item.status == status), verb)
+        for status, verb in (
+            ("ruled_out", "ruled out"),
+            ("open", "not checked"),
+            ("inconclusive", "left unresolved"),
+            ("confirmed", "also confirmed"),
+        )
+    ]
+    groups = [(count, verb) for count, verb in groups if count]
+    total = len(others)
+    if len(groups) == 1:
+        verb = groups[0][1]
+        if total == 1:
+            return f"The other cause was {verb}."
+        return f"The other {_number(total)} causes were {verb}."
+    parts = [f"{_number(count)} {_was(count)} {verb}" for count, verb in groups]
+    return f"Of the other {_number(total)} causes, {_and_join(parts)}."
+
+
+def _escalation_paragraphs(graph: FaultGraph, state: DiagnosticState) -> list[str]:
+    field_by_name = {field.name: field for field in graph.fields}
+    check_by_id = {check.id: check for check in graph.checks}
+    facts = state.facts
+    total = len(state.causes)
+
+    contradictions = [item for item in state.causes if item.status == "contradiction"]
+    if contradictions:
+        cause = contradictions[0]
+        reason = cause_reason(graph, cause, facts) or "the answers conflict"
+        recheck = _rechecks(graph, cause.because, check_by_id)
+        return [
+            f"The answers both confirm and rule out {_lower_first(cause.name)}: "
+            f"{_lower_first(reason.removeprefix('Answers conflict: '))}.",
+            _escalate_sentence(recheck),
+        ]
+
+    ruled_out = [item for item in state.causes if item.status == "ruled_out"]
+    inconclusive = [item for item in state.causes if item.status == "inconclusive"]
+    open_causes = [item for item in state.causes if item.status == "open"]
+
+    sentences = [
+        f"None of the {_number(total)} documented causes could be confirmed."
+        if total > 1
+        else "The documented cause could not be confirmed."
+    ]
+    if ruled_out:
+        if len(ruled_out) == total:
+            sentences.append(
+                f"All {_number(total)} were ruled out by the checks."
+                if total > 1
+                else "It was ruled out by the checks."
+            )
+        else:
+            count = len(ruled_out)
+            sentences.append(
+                f"{_upper_first(_number(count))} {_was(count)} ruled out by the checks."
+            )
+
+    unsure_fields: list[str] = []
+    for item in inconclusive:
+        answered = [
+            name for name in item.because if facts.get(name) not in (None, UNCLEAR)
+        ]
+        unsure = [name for name in item.because if facts.get(name) == UNCLEAR]
+        unsure_fields.extend(name for name in unsure if name not in unsure_fields)
+        known = _and_join(
+            [_lower_first(fact_phrase(field_by_name[name], facts[name])) for name in answered]
+        )
+        not_sure = (
+            "you weren't sure about "
+            + _and_join([unsure_subject(field_by_name[name]) for name in unsure])
+            if unsure
+            else ""
+        )
+        if known and not_sure:
+            detail = f"{known}, but {not_sure}"
+        else:
+            detail = known or not_sure
+        sentences.append(f"{_sentence_body(item.name)} is still possible: {detail}.")
+
+    for item in open_causes:
+        sentences.append(
+            f"The documented checks do not settle {_lower_first(item.name)}."
+        )
+
+    recheck = _rechecks(graph, unsure_fields, check_by_id)
+    return [" ".join(sentences), _escalate_sentence(recheck)]
+
+
+def _rechecks(
+    graph: FaultGraph, field_names: list[str], check_by_id: dict[str, Check]
+) -> list[str]:
+    """What to recheck, in graph check order, for checks collecting these fields."""
+    wanted = set(field_names)
+    return [
+        check.recheck if check.recheck is not None else _lower_first(check.instruction.rstrip("."))
+        for check in graph.checks
+        if wanted & set(check.collects)
+    ]
+
+
+def _escalate_sentence(recheck: list[str]) -> str:
+    if recheck:
+        return f"{ESCALATE}, and recheck {_and_join(recheck)} first."
+    return f"{ESCALATE}."
+
+
+def _citation(source: Source) -> str:
+    page = display_page(source)
+    page_bit = f", p. {page}" if page is not None else ""
+    return f"{short_doc_name(source.doc_id)}, {section_short_label(source.section)}{page_bit}"
+
+
+def _number(count: int) -> str:
+    return _NUMBER_WORDS[count] if count < len(_NUMBER_WORDS) else str(count)
+
+
+def _was(count: int) -> str:
+    return "was" if count == 1 else "were"
+
+
+def _and_join(parts: list[str]) -> str:
+    if len(parts) <= 1:
+        return "".join(parts)
+    return ", ".join(parts[:-1]) + " and " + parts[-1]
+
+
+def _sentence(text: str) -> str:
+    """A sentence ending in exactly one full stop (or its own ? / !)."""
+    text = text.strip()
+    return text if text.endswith((".", "?", "!")) else f"{text}."
+
+
+def _sentence_body(text: str) -> str:
+    return text.strip().rstrip(".")

@@ -44,7 +44,10 @@ describe("ReportView", () => {
           printed_page: 543,
         },
       },
-      escalation_reason: null,
+      outcome: [
+        "Root cause found: Cooling fan not operating. Replace the fan. Source: ABB ACS580 firmware manual, A581 Fan, p. 543.",
+        "The other cause was not checked.",
+      ],
       facts: [
         {
           field: "fan_status",
@@ -89,6 +92,10 @@ describe("ReportView", () => {
       ).toBeGreaterThan(0),
     );
     expect(screen.getByText("Confirmed")).toBeInTheDocument();
+    expect(
+      screen.getByText(/^Root cause found: Cooling fan not operating\./),
+    ).toBeInTheDocument();
+    expect(screen.getByText("The other cause was not checked.")).toBeInTheDocument();
     expect(screen.getByText(/Fan not running/)).toBeInTheDocument();
     expect(screen.getByText("Not checked")).toBeInTheDocument();
     expect(screen.queryByText("Open")).toBeNull();

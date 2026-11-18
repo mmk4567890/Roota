@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as api from "../api";
 import {
+  makeEscalatedSession,
   makeObservationResponse,
   makeSession,
   sampleFault,
@@ -71,6 +72,20 @@ describe("SessionScreen", () => {
 
     expect(await screen.findByText(message)).toBeInTheDocument();
     expect(screen.queryByText(UNCLEAR_MOVED_ON_MESSAGE)).not.toBeInTheDocument();
+  });
+
+  it("shows the outcome as the API's plain sentences", () => {
+    renderSession({ session: makeEscalatedSession() });
+    expect(screen.getByRole("heading", { name: "ESCALATED" })).toBeInTheDocument();
+    expect(
+      screen.getByText(/^None of the four documented causes could be confirmed\./),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Escalate to a senior technician or OEM support."),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("All documented causes for this fault have been ruled out."),
+    ).toBeNull();
   });
 
   it("shows API errors without clearing the text box", async () => {

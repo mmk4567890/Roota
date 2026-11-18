@@ -37,6 +37,7 @@ from app.repository import (
 from app.retrieval.evidence import get_evidence
 from app.retrieval.store import TBD_MANUAL, ManualStore
 from app.routers.docs import get_manual_store
+from app.wording import outcome_paragraphs
 
 logger = logging.getLogger(__name__)
 
@@ -184,6 +185,7 @@ def report_observation(
         created_at=view.created_at,
         events=view.events,
         state=view.state,
+        outcome=view.outcome,
         parse=parsed,
         message=_observation_message(parsed),
     )
@@ -322,6 +324,7 @@ def _session_view(
         created_at=record.created_at,
         events=events,
         state=state,
+        outcome=outcome_paragraphs(graph, state),
     )
 
 

@@ -77,6 +77,7 @@ export function makeSession(
     status: "active",
     created_at: "2026-01-01T12:00:00Z",
     events: [],
+    outcome: null,
     state: {
       fault_id: "overtemperature",
       facts: {},
@@ -143,6 +144,33 @@ export function makeObservationResponse(
       notes: "",
     },
     message: null,
+    ...overrides,
+  };
+}
+
+/** A session the engine has escalated, with the API's outcome sentences. */
+export function makeEscalatedSession(
+  overrides: Partial<SessionView> = {},
+): SessionView {
+  const base = makeSession();
+  return {
+    ...base,
+    outcome: [
+      "None of the four documented causes could be confirmed. All four were ruled out by the checks.",
+      "Escalate to a senior technician or OEM support.",
+    ],
+    state: {
+      ...base.state,
+      causes: base.state.causes.map((cause) => ({
+        ...cause,
+        status: "ruled_out" as const,
+        because: ["fan_status"],
+      })),
+      next_action: makeAction({
+        type: "escalate",
+        message: "All documented causes for this fault have been ruled out.",
+      }),
+    },
     ...overrides,
   };
 }

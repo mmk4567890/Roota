@@ -115,6 +115,8 @@ export interface SessionView {
   created_at: string;
   events: Event[];
   state: DiagnosticState;
+  /** Plain sentences for the root cause or escalation; null while checks remain. */
+  outcome: string[] | null;
 }
 
 export interface RejectedValue {
@@ -205,7 +207,8 @@ export interface SessionSummary {
   closed_at: string | null;
   causes: SummaryCause[];
   root_cause: RootCauseSummary | null;
-  escalation_reason: string | null;
+  /** Plain sentences for the root cause or escalation; null while in progress. */
+  outcome: string[] | null;
   facts: FactReport[];
   citations: CitationUsed[];
 }

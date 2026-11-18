@@ -42,7 +42,8 @@ def test_build_summary_root_cause_and_observation_fact() -> None:
     assert summary.status == "active"
     assert summary.root_cause is not None
     assert summary.root_cause.cause_id == "cooling_fan_failure"
-    assert summary.escalation_reason is None
+    assert summary.outcome is not None
+    assert summary.outcome[0].startswith("Root cause found: ")
     assert len(summary.facts) == 1
     assert summary.facts[0].field == "fan_status"
     assert summary.facts[0].field_label == "Fan"
@@ -253,10 +254,9 @@ def test_summary_escalation_names_inconclusive_fan(client: TestClient) -> None:
     )
     summary = client.get(f"/sessions/{session_id}/summary").json()
     assert summary["root_cause"] is None
-    assert summary["escalation_reason"] is not None
-    assert "Cooling fan not operating" in summary["escalation_reason"]
-    assert "Fan: Noisy" in summary["escalation_reason"]
-    assert "fan_status" not in summary["escalation_reason"]
+    outcome = " ".join(summary["outcome"])
+    assert "Cooling fan not operating is still possible: fan running but noisy." in outcome
+    assert "fan_status" not in outcome
     assert any(c["status"] == "inconclusive" for c in summary["causes"])
     fan = next(c for c in summary["causes"] if c["cause_id"] == "cooling_fan_failure")
     assert fan["status_label"] == "Inconclusive"
@@ -340,4 +340,104 @@ def test_ruled_out_by_one_fact_names_only_that_check() -> None:
     summary = _shipped_summary({"ambient_above_derating_temp": "no"})
     assert _by_id(summary)["load_above_derated_capacity"].reason == (
         "Room below the derating limit"
+    )
+
+
+# --- Outcome in plain sentences ---
+
+
+_ALL_CLEAR = {
+    "fan_status": "normal",
+    "airflow_obstruction": "none",
+    "heatsink_condition": "clean",
+    "ambient_above_derating_temp": "no",
+    "motor_power_vs_drive": "within",
+}
+
+
+def test_root_cause_outcome_reads_as_sentences() -> None:
+    summary = _shipped_summary({"fan_status": "not_running"})
+    assert summary.outcome is not None
+    first, others = summary.outcome
+    assert first.startswith("Root cause found: Cooling fan not operating. Check fan operation")
+    assert first.endswith("Source: ABB ACS580 firmware manual, A581 Fan, p. 543.")
+    assert ".." not in first
+    assert others == "The other three causes were not checked."
+
+
+def test_root_cause_outcome_counts_ruled_out_and_not_checked_causes() -> None:
+    summary = _shipped_summary(
+        {"fan_status": "normal", "airflow_obstruction": "none", "heatsink_condition": "dusty"}
+    )
+    assert summary.outcome is not None
+    assert summary.outcome[0].startswith(
+        "Root cause found: Obstructed cooling air flow or dusty heatsink. "
+    )
+    assert summary.outcome[1] == (
+        "Of the other three causes, one was ruled out and two were not checked."
+    )
+
+
+def test_escalation_with_an_unsure_check_names_it_and_suggests_rechecking() -> None:
+    summary = _shipped_summary({**_ALL_CLEAR, "airflow_obstruction": "unclear"})
+    assert summary.root_cause is None
+    assert summary.outcome == [
+        "None of the four documented causes could be confirmed. "
+        "Three were ruled out by the checks. "
+        "Obstructed cooling air flow or dusty heatsink is still possible: "
+        "heatsink was clean, but you weren't sure about the air flow.",
+        "Escalate to a senior technician or OEM support, "
+        "and recheck the air path through the cabinet first.",
+    ]
+    md = render_markdown(summary)
+    assert "## Escalation" in md
+    assert "you weren't sure about the air flow" in md
+
+
+def test_escalation_with_several_unsure_checks_rechecks_each_one() -> None:
+    summary = _shipped_summary(
+        {
+            **_ALL_CLEAR,
+            "ambient_above_derating_temp": "unclear",
+            "load_within_derated_capacity": "unclear",
+        }
+    )
+    assert summary.outcome is not None
+    text = " ".join(summary.outcome)
+    assert "Three were ruled out by the checks." in text
+    assert "you weren't sure about the room temperature and the load." in text
+    assert text.endswith(
+        "recheck the ambient temperature at the drive and the load current "
+        "against the derated rating first."
+    )
+
+
+def test_escalation_when_every_cause_is_ruled_out() -> None:
+    summary = _shipped_summary(_ALL_CLEAR)
+    assert summary.outcome == [
+        "None of the four documented causes could be confirmed. "
+        "All four were ruled out by the checks.",
+        "Escalate to a senior technician or OEM support.",
+    ]
+
+
+def test_outcome_is_none_while_checks_remain() -> None:
+    summary = _shipped_summary({"fan_status": "normal"})
+    assert summary.outcome is None
+    assert "Session still in progress." in render_markdown(summary)
+
+
+def test_session_api_returns_the_outcome_sentences(client: TestClient) -> None:
+    created = client.post(
+        "/sessions",
+        json={"fault_id": "acs580_overtemperature", "equipment_label": "Line 4"},
+    )
+    session_id = created.json()["id"]
+    assert created.json()["outcome"] is None
+    reported = client.post(
+        f"/sessions/{session_id}/facts", json={"facts": {"fan_status": "not_running"}}
+    )
+    assert reported.status_code == 200, reported.text
+    assert reported.json()["outcome"][0].startswith(
+        "Root cause found: Cooling fan not operating."
     )

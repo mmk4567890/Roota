@@ -77,6 +77,8 @@ class SessionView(BaseModel):
     created_at: datetime
     events: list[Event]
     state: DiagnosticState
+    # Plain sentences for the root cause or escalation; None while checks remain.
+    outcome: list[str] | None = None
 
 
 class ObservationResponse(SessionView):

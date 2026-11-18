@@ -153,26 +153,14 @@ function ReportBody({ summary }: { summary: SessionSummary }) {
 
       <section>
         <h2 className="mb-2 text-lg font-medium">Outcome</h2>
-        {summary.root_cause ? (
+        {summary.outcome ? (
           <div className="space-y-2">
-            <p>
-              <span className="font-medium">Root cause:</span>{" "}
-              {summary.root_cause.name}
-            </p>
-            <p>{summary.root_cause.corrective_action}</p>
-            <p className="text-black/70">
-              {summary.root_cause.source
-                ? citationLine(summary, summary.root_cause.source.doc_id, summary.root_cause.source.section, summary.root_cause.source.printed_page ?? summary.root_cause.source.page)
-                : null}
-            </p>
-          </div>
-        ) : summary.escalation_reason ? (
-          <div className="space-y-2">
-            <p className="font-medium">Escalated</p>
-            <p>{summary.escalation_reason}</p>
+            {summary.outcome.map((paragraph) => (
+              <p key={paragraph}>{paragraph}</p>
+            ))}
           </div>
         ) : (
-          <p>Session closed without a terminal diagnosis.</p>
+          <p>Session closed without a diagnosis.</p>
         )}
       </section>
 
@@ -241,17 +229,4 @@ function ReportBody({ summary }: { summary: SessionSummary }) {
       </section>
     </div>
   );
-}
-
-function citationLine(
-  summary: SessionSummary,
-  docId: string,
-  section: string,
-  page: number | null | undefined,
-): string {
-  const cite = summary.citations.find((item) => item.doc_id === docId);
-  const name = cite?.short_name ?? docId;
-  const label = cite?.section_label ?? section;
-  const pageBit = page != null ? ` · p. ${page}` : "";
-  return `${name} · ${label}${pageBit}`;
 }

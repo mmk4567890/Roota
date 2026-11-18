@@ -61,7 +61,6 @@ export function SessionScreen({
     action.type === "check" && action.check ? action.check.id : null;
   const isOutcome =
     action.type === "root_cause" || action.type === "escalate" || closed;
-  const canViewReport = isOutcome;
 
   const checkTotal = Math.max(fault.check_count, 1);
   const onActiveCheck = Boolean(checkId) || action.type === "need_info";
@@ -235,36 +234,20 @@ export function SessionScreen({
             />
           ) : null}
 
-          {isOutcome &&
-          (action.type === "root_cause" || action.type === "escalate") ? (
+          {isOutcome ? (
             <OutcomeView
-              action={action}
-              causes={session.state.causes}
-              onViewReport={() => {
-                if (canViewReport) {
-                  setReportOpen(true);
-                }
-              }}
+              kind={
+                action.type === "root_cause" || action.type === "escalate"
+                  ? action.type
+                  : "closed"
+              }
+              paragraphs={
+                session.outcome ?? ["Session closed without a diagnosis."]
+              }
+              onViewReport={() => setReportOpen(true)}
               onCloseSession={() => void handleClose()}
               closeBusy={closeBusy}
               closed={closed}
-            />
-          ) : null}
-
-          {closed &&
-          action.type !== "root_cause" &&
-          action.type !== "escalate" ? (
-            <OutcomeView
-              action={{
-                ...action,
-                type: "escalate",
-                message: "Session closed.",
-              }}
-              causes={session.state.causes}
-              onViewReport={() => setReportOpen(true)}
-              onCloseSession={() => undefined}
-              closeBusy={false}
-              closed
             />
           ) : null}
 
@@ -288,7 +271,7 @@ export function SessionScreen({
         onUndo={(id) => void handleUndo(id)}
       />
 
-      {reportOpen && canViewReport ? (
+      {reportOpen && isOutcome ? (
         <ReportView
           sessionId={session.id}
           onClose={() => setReportOpen(false)}
