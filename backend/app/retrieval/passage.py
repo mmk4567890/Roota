@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import re
 
-# Trailing fragments left when a fault-table header straddles a chunk boundary.
-_TABLE_HEADER_FRAGMENTS = (
-    "Code (hex) Fault / Aux. code Cause What to do",
-    "Code (hex) Fault/Aux. code Cause What to do",
-    "Code (hex) Fault / Aux. code Cause",
-    "Fault / Aux. code Cause What to do",
+# The fault-table header "Code (hex) Fault / Aux. code Cause What to do" that
+# pypdf leaves at the end of an entry chunk when the next table page starts.
+# Any leading part of it (down to a bare "Code (hex)"), or the part from
+# "Fault" to the end, is a fragment when it ends the passage.
+_TRAILING_TABLE_HEADER_RE = re.compile(
+    r"(?:^|\s)(?:"
+    r"Code\s+\(hex\)"
+    r"(?:\s+Fault(?:\s*/\s*Aux\.(?:\s+code(?:\s+Cause(?:\s+What(?:\s+to(?:\s+do)?)?)?)?)?)?)?"
+    r"|Fault\s*/\s*Aux\.\s+code\s+Cause\s+What\s+to\s+do"
+    r")\s*$"
 )
 
 _LIST_ITEM_RE = re.compile(
@@ -56,15 +60,8 @@ def reflow_passage(text: str) -> str:
 
 
 def _drop_table_header_fragments(text: str) -> str:
-    stripped = text.rstrip()
-    for fragment in _TABLE_HEADER_FRAGMENTS:
-        if stripped.endswith(fragment):
-            return stripped[: -len(fragment)].rstrip()
-        # Sometimes the fragment sits on its own final line.
-        lines = stripped.split("\n")
-        if lines and lines[-1].strip() == fragment:
-            return "\n".join(lines[:-1]).rstrip()
-    return stripped
+    """Strip a trailing fault-table header fragment, on its own line or not."""
+    return _TRAILING_TABLE_HEADER_RE.sub("", text.rstrip()).rstrip()
 
 
 def _join_soft_breaks(lines: list[str]) -> str:
