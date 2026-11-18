@@ -1,27 +1,21 @@
 import { FileText, XCircle } from "lucide-react";
+import type { Outcome } from "../api";
 import { CornerTicks } from "./CornerTicks";
 
 export type OutcomeKind = "root_cause" | "escalate" | "closed";
 
 interface OutcomeViewProps {
   kind: OutcomeKind;
-  /** Plain sentences from the API, one paragraph each. */
-  paragraphs: string[];
+  outcome: Outcome;
   onViewReport: () => void;
   onCloseSession: () => void;
   closeBusy: boolean;
   closed: boolean;
 }
 
-const HEADINGS: Record<OutcomeKind, string> = {
-  root_cause: "ROOT CAUSE",
-  escalate: "ESCALATED",
-  closed: "CLOSED",
-};
-
 export function OutcomeView({
   kind,
-  paragraphs,
+  outcome,
   onViewReport,
   onCloseSession,
   closeBusy,
@@ -29,18 +23,18 @@ export function OutcomeView({
 }: OutcomeViewProps) {
   return (
     <CornerTicks className="bg-transparent px-4 py-5 sm:px-6 sm:py-6">
-      <h2 className="hud-display flex items-center gap-3 text-32">
+      <h2 className="hud-display flex items-center gap-3 text-20 sm:text-32">
         {kind === "escalate" ? (
           <span
-            className="inline-block h-2 w-2 rounded-full bg-hud-escalated"
+            className="inline-block h-2 w-2 shrink-0 rounded-full bg-hud-escalated"
             aria-hidden
           />
         ) : null}
-        {HEADINGS[kind]}
+        {outcome.headline}
       </h2>
 
       <div className="mt-5 space-y-3">
-        {paragraphs.map((paragraph, index) => (
+        {outcome.paragraphs.map((paragraph, index) => (
           <p
             key={paragraph}
             className={
@@ -52,6 +46,11 @@ export function OutcomeView({
             {paragraph}
           </p>
         ))}
+        {outcome.source ? (
+          <p className="font-mono text-12 text-hud-muted">
+            Source: {outcome.source}
+          </p>
+        ) : null}
       </div>
 
       <div className="mt-8 flex flex-wrap gap-3">

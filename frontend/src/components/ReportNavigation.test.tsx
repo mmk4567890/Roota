@@ -50,7 +50,7 @@ describe("report navigation", () => {
     await openReport();
     fireEvent.keyDown(window, { key: "Escape" });
     await waitFor(() => expect(reportShown()).toBe(false));
-    expect(screen.getByRole("heading", { name: "ESCALATED" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Escalated" })).toBeInTheDocument();
   });
 
   it("closes the report on browser Back", async () => {
@@ -58,7 +58,7 @@ describe("report navigation", () => {
     await openReport();
     window.history.back();
     await waitFor(() => expect(reportShown()).toBe(false));
-    expect(screen.getByRole("heading", { name: "ESCALATED" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Escalated" })).toBeInTheDocument();
   });
 
   it("still closes with the Close button", async () => {

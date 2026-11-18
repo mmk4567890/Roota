@@ -76,7 +76,7 @@ describe("SessionScreen", () => {
 
   it("shows the outcome as the API's plain sentences", () => {
     renderSession({ session: makeEscalatedSession() });
-    expect(screen.getByRole("heading", { name: "ESCALATED" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Escalated" })).toBeInTheDocument();
     expect(
       screen.getByText(/^None of the four documented causes could be confirmed\./),
     ).toBeInTheDocument();

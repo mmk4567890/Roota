@@ -61,7 +61,7 @@ describe("session in the URL", () => {
     render(<App />);
 
     expect(
-      await screen.findByRole("heading", { name: "ESCALATED" }),
+      await screen.findByRole("heading", { name: "Escalated" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /View report/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "New session" })).toBeInTheDocument();
@@ -83,7 +83,7 @@ describe("session in the URL", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Start session" }));
 
-    await screen.findByRole("heading", { name: "ESCALATED" });
+    await screen.findByRole("heading", { name: "Escalated" });
     expect(window.location.search).toBe(
       "?session=11111111-1111-1111-1111-111111111111",
     );

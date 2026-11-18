@@ -27,7 +27,8 @@ from app.wording import (
     cause_reason,
     cause_status_label,
     not_checked_reason,
-    outcome_paragraphs,
+    Outcome,
+    build_outcome,
 )
 
 
@@ -98,8 +99,8 @@ class SessionSummary(BaseModel):
     closed_at: datetime | None
     causes: list[SummaryCause]
     root_cause: RootCauseSummary | None
-    # Plain sentences for the root cause or escalation; None while in progress.
-    outcome: list[str] | None
+    # Headline, paragraphs and source line; None while in progress.
+    outcome: Outcome | None
     facts: list[FactReport]
     citations: list[CitationUsed]
 
@@ -142,7 +143,7 @@ def build_summary(
             outcome_type=state.next_action.type,
         ),
         root_cause=root_cause,
-        outcome=outcome_paragraphs(graph, state),
+        outcome=build_outcome(graph, state),
         facts=_fact_reports(events, graph),
         citations=_citations_used(graph, state),
     )
@@ -164,17 +165,13 @@ def render_markdown(summary: SessionSummary) -> str:
         lines.append(f"- **Closed:** {summary.closed_at.isoformat()}")
     lines.append("")
 
-    heading = (
-        "Root cause"
-        if summary.root_cause is not None
-        else "Escalation"
-        if summary.outcome is not None
-        else "Outcome"
-    )
-    lines.extend([f"## {heading}", ""])
+    lines.extend(["## Outcome", ""])
     if summary.outcome is not None:
-        for paragraph in summary.outcome:
+        lines.extend([f"### {summary.outcome.headline}", ""])
+        for paragraph in summary.outcome.paragraphs:
             lines.extend([paragraph, ""])
+        if summary.outcome.source is not None:
+            lines.extend([f"`Source: {summary.outcome.source}`", ""])
     elif summary.status == "closed":
         lines.extend(["Session closed without a diagnosis.", ""])
     else:

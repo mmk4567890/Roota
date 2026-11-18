@@ -37,7 +37,7 @@ from app.repository import (
 from app.retrieval.evidence import get_evidence
 from app.retrieval.store import TBD_MANUAL, ManualStore
 from app.routers.docs import get_manual_store
-from app.wording import outcome_paragraphs
+from app.wording import build_outcome
 
 logger = logging.getLogger(__name__)
 
@@ -324,7 +324,7 @@ def _session_view(
         created_at=record.created_at,
         events=events,
         state=state,
-        outcome=outcome_paragraphs(graph, state),
+        outcome=build_outcome(graph, state),
     )
 
 

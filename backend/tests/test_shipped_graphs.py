@@ -398,7 +398,7 @@ def test_escalation_outcome_never_contains_raw_field_ids(acs580: FaultGraph) -> 
     )
     assert summary.outcome is not None
     for name in field_names:
-        assert name not in " ".join(summary.outcome)
+        assert name not in " ".join(summary.outcome.paragraphs)
         assert name not in render_markdown(summary)
         for cause in summary.causes:
             assert name not in (cause.reason or "")

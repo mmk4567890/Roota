@@ -156,10 +156,14 @@ export function makeEscalatedSession(
   const base = makeSession();
   return {
     ...base,
-    outcome: [
-      "None of the four documented causes could be confirmed. All four were ruled out by the checks.",
-      "Escalate to a senior technician or OEM support.",
-    ],
+    outcome: {
+      headline: "Escalated",
+      paragraphs: [
+        "None of the four documented causes could be confirmed. All four were ruled out by the checks.",
+        "Escalate to a senior technician or OEM support.",
+      ],
+      source: null,
+    },
     state: {
       ...base.state,
       causes: base.state.causes.map((cause) => ({
@@ -189,7 +193,11 @@ export function makeSummary(
     closed_at: null,
     causes: [],
     root_cause: null,
-    outcome: ["Escalate to a senior technician or OEM support."],
+    outcome: {
+      headline: "Escalated",
+      paragraphs: ["Escalate to a senior technician or OEM support."],
+      source: null,
+    },
     facts: [],
     citations: [],
     ...overrides,

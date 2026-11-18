@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.engine.engine import DiagnosticState
 from app.parser.base import ParseResult
+from app.wording import Outcome
 
 MAX_OBSERVATION_TEXT_LENGTH = 2000
 
@@ -77,8 +78,8 @@ class SessionView(BaseModel):
     created_at: datetime
     events: list[Event]
     state: DiagnosticState
-    # Plain sentences for the root cause or escalation; None while checks remain.
-    outcome: list[str] | None = None
+    # Headline, paragraphs and source line; None while checks remain.
+    outcome: Outcome | None = None
 
 
 class ObservationResponse(SessionView):

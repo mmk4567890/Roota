@@ -10,6 +10,8 @@ from __future__ import annotations
 from collections.abc import Iterator
 from typing import Any
 
+from pydantic import BaseModel, ConfigDict
+
 from app.engine.engine import CauseStatus, DiagnosticState, Truth, evaluate_condition
 from app.engine.schema import (
     UNCLEAR,
@@ -166,33 +168,49 @@ _NUMBER_WORDS = (
 )
 
 
-def outcome_paragraphs(graph: FaultGraph, state: DiagnosticState) -> list[str] | None:
-    """Short readable sentences for a root cause or an escalation.
+class Outcome(BaseModel):
+    """How a session ended, ready to show: a headline, paragraphs, a source line."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    # "Root cause: <cause>" or "Escalated".
+    headline: str
+    # The action first, then what happened to the other causes.
+    paragraphs: list[str]
+    # "ABB ACS580 firmware manual · A581 Fan · p. 543"; None for escalations.
+    source: str | None
+
+
+def build_outcome(graph: FaultGraph, state: DiagnosticState) -> Outcome | None:
+    """Short readable outcome for a root cause or an escalation.
 
     ``None`` while the engine still has a check to ask.
     """
     action = state.next_action
     if action.type == "root_cause" and action.cause_id is not None:
-        return _root_cause_paragraphs(graph, state, action.cause_id)
+        return _root_cause_outcome(graph, state, action.cause_id)
     if action.type == "escalate":
-        return _escalation_paragraphs(graph, state)
+        return Outcome(
+            headline="Escalated",
+            paragraphs=_escalation_paragraphs(graph, state),
+            source=None,
+        )
     return None
 
 
-def _root_cause_paragraphs(
+def _root_cause_outcome(
     graph: FaultGraph, state: DiagnosticState, cause_id: str
-) -> list[str]:
+) -> Outcome:
     cause = _graph_cause(graph, cause_id)
-    first = (
-        f"Root cause found: {_sentence_body(cause.name)}. "
-        f"{_sentence(cause.corrective_action)} "
-        f"Source: {_citation(cause.action_source)}."
-    )
+    paragraphs = [_sentence(cause.corrective_action)]
     others = [item for item in state.causes if item.cause_id != cause_id]
-    paragraphs = [first]
     if others:
         paragraphs.append(_other_causes_sentence(others))
-    return paragraphs
+    return Outcome(
+        headline=f"Root cause: {_sentence_body(cause.name)}",
+        paragraphs=paragraphs,
+        source=_citation(cause.action_source),
+    )
 
 
 def _other_causes_sentence(others: list[CauseStatus]) -> str:
@@ -306,8 +324,8 @@ def _escalate_sentence(recheck: list[str]) -> str:
 
 def _citation(source: Source) -> str:
     page = display_page(source)
-    page_bit = f", p. {page}" if page is not None else ""
-    return f"{short_doc_name(source.doc_id)}, {section_short_label(source.section)}{page_bit}"
+    page_bit = f" · p. {page}" if page is not None else ""
+    return f"{short_doc_name(source.doc_id)} · {section_short_label(source.section)}{page_bit}"
 
 
 def _number(count: int) -> str:

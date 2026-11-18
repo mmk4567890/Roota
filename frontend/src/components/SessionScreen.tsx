@@ -7,6 +7,7 @@ import {
   undoEvent,
   type FaultInfo,
   type ObservationResponse,
+  type Outcome,
   type ParseResult,
   type SessionView,
 } from "../api";
@@ -17,6 +18,13 @@ import { OutcomeView } from "./OutcomeView";
 import { ReportView } from "./ReportView";
 import { SessionLogDrawer } from "./SessionLogDrawer";
 import { TopBar } from "./TopBar";
+
+/** Shown when a session is closed before the engine reached an outcome. */
+const CLOSED_OUTCOME: Outcome = {
+  headline: "Closed",
+  paragraphs: ["Session closed without a diagnosis."],
+  source: null,
+};
 
 /** history.state marker for the entry pushed when the report opens. */
 const REPORT_HISTORY_STATE = "roota-report";
@@ -287,9 +295,7 @@ export function SessionScreen({
                   ? action.type
                   : "closed"
               }
-              paragraphs={
-                session.outcome ?? ["Session closed without a diagnosis."]
-              }
+              outcome={session.outcome ?? CLOSED_OUTCOME}
               onViewReport={openReport}
               onCloseSession={() => void handleClose()}
               closeBusy={closeBusy}

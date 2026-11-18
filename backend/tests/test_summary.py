@@ -43,7 +43,7 @@ def test_build_summary_root_cause_and_observation_fact() -> None:
     assert summary.root_cause is not None
     assert summary.root_cause.cause_id == "cooling_fan_failure"
     assert summary.outcome is not None
-    assert summary.outcome[0].startswith("Root cause found: ")
+    assert summary.outcome.headline == "Root cause: Cooling fan not operating"
     assert len(summary.facts) == 1
     assert summary.facts[0].field == "fan_status"
     assert summary.facts[0].field_label == "Fan"
@@ -254,7 +254,8 @@ def test_summary_escalation_names_inconclusive_fan(client: TestClient) -> None:
     )
     summary = client.get(f"/sessions/{session_id}/summary").json()
     assert summary["root_cause"] is None
-    outcome = " ".join(summary["outcome"])
+    assert summary["outcome"]["headline"] == "Escalated"
+    outcome = " ".join(summary["outcome"]["paragraphs"])
     assert "Cooling fan not operating is still possible: fan running but noisy." in outcome
     assert "fan_status" not in outcome
     assert any(c["status"] == "inconclusive" for c in summary["causes"])
@@ -362,11 +363,19 @@ _ALL_CLEAR = {
 def test_root_cause_outcome_reads_as_sentences() -> None:
     summary = _shipped_summary({"fan_status": "not_running"})
     assert summary.outcome is not None
-    first, others = summary.outcome
-    assert first.startswith("Root cause found: Cooling fan not operating. Check fan operation")
-    assert first.endswith("Source: ABB ACS580 firmware manual, A581 Fan, p. 543.")
-    assert ".." not in first
+    assert summary.outcome.headline == "Root cause: Cooling fan not operating"
+    action, others = summary.outcome.paragraphs
+    assert action.startswith("Check fan operation and connection")
+    assert "Source" not in action
+    assert ".." not in action
     assert others == "The other three causes were not checked."
+    assert summary.outcome.source == "ABB ACS580 firmware manual · A581 Fan · p. 543"
+    md = render_markdown(summary)
+    assert (
+        "## Outcome\n\n### Root cause: Cooling fan not operating\n\n"
+        "Check fan operation and connection"
+    ) in md
+    assert "`Source: ABB ACS580 firmware manual · A581 Fan · p. 543`" in md
 
 
 def test_root_cause_outcome_counts_ruled_out_and_not_checked_causes() -> None:
@@ -374,10 +383,10 @@ def test_root_cause_outcome_counts_ruled_out_and_not_checked_causes() -> None:
         {"fan_status": "normal", "airflow_obstruction": "none", "heatsink_condition": "dusty"}
     )
     assert summary.outcome is not None
-    assert summary.outcome[0].startswith(
-        "Root cause found: Obstructed cooling air flow or dusty heatsink. "
+    assert summary.outcome.headline == (
+        "Root cause: Obstructed cooling air flow or dusty heatsink"
     )
-    assert summary.outcome[1] == (
+    assert summary.outcome.paragraphs[1] == (
         "Of the other three causes, one was ruled out and two were not checked."
     )
 
@@ -385,7 +394,10 @@ def test_root_cause_outcome_counts_ruled_out_and_not_checked_causes() -> None:
 def test_escalation_with_an_unsure_check_names_it_and_suggests_rechecking() -> None:
     summary = _shipped_summary({**_ALL_CLEAR, "airflow_obstruction": "unclear"})
     assert summary.root_cause is None
-    assert summary.outcome == [
+    assert summary.outcome is not None
+    assert summary.outcome.headline == "Escalated"
+    assert summary.outcome.source is None
+    assert summary.outcome.paragraphs == [
         "None of the four documented causes could be confirmed. "
         "Three were ruled out by the checks. "
         "Obstructed cooling air flow or dusty heatsink is still possible: "
@@ -394,7 +406,8 @@ def test_escalation_with_an_unsure_check_names_it_and_suggests_rechecking() -> N
         "and recheck the air path through the cabinet first.",
     ]
     md = render_markdown(summary)
-    assert "## Escalation" in md
+    assert "### Escalated" in md
+    assert "Source:" not in md.split("## Cause checklist")[0]
     assert "you weren't sure about the air flow" in md
 
 
@@ -407,7 +420,7 @@ def test_escalation_with_several_unsure_checks_rechecks_each_one() -> None:
         }
     )
     assert summary.outcome is not None
-    text = " ".join(summary.outcome)
+    text = " ".join(summary.outcome.paragraphs)
     assert "Three were ruled out by the checks." in text
     assert "you weren't sure about the room temperature and the load." in text
     assert text.endswith(
@@ -418,7 +431,8 @@ def test_escalation_with_several_unsure_checks_rechecks_each_one() -> None:
 
 def test_escalation_when_every_cause_is_ruled_out() -> None:
     summary = _shipped_summary(_ALL_CLEAR)
-    assert summary.outcome == [
+    assert summary.outcome is not None
+    assert summary.outcome.paragraphs == [
         "None of the four documented causes could be confirmed. "
         "All four were ruled out by the checks.",
         "Escalate to a senior technician or OEM support.",
@@ -442,9 +456,10 @@ def test_session_api_returns_the_outcome_sentences(client: TestClient) -> None:
         f"/sessions/{session_id}/facts", json={"facts": {"fan_status": "not_running"}}
     )
     assert reported.status_code == 200, reported.text
-    assert reported.json()["outcome"][0].startswith(
-        "Root cause found: Cooling fan not operating."
-    )
+    outcome = reported.json()["outcome"]
+    assert outcome["headline"] == "Root cause: Cooling fan not operating"
+    assert outcome["paragraphs"][0].startswith("Check fan operation")
+    assert outcome["source"] == "ABB ACS580 firmware manual · A581 Fan · p. 543"
 
 
 def test_open_causes_have_no_reason_mid_session() -> None:
@@ -480,12 +495,14 @@ def test_several_unsure_checks_join_in_lowercase() -> None:
 def test_motor_root_cause_action_reads_plainly() -> None:
     summary = _shipped_summary({**_ALL_CLEAR, "motor_power_vs_drive": "exceeds"})
     assert summary.outcome is not None
-    assert summary.outcome[0] == (
-        "Root cause found: Motor power exceeds drive power. "
+    assert summary.outcome.headline == "Root cause: Motor power exceeds drive power"
+    assert summary.outcome.paragraphs[0] == (
         "Resolve the mismatch between motor and drive ratings before returning to "
         "service: use a drive rated for the motor, or a motor within the drive's rating. "
-        "The firmware manual's guidance is to check motor power against drive power. "
-        "Source: ABB ACS580 firmware manual, 4210 IGBT overtemperature, p. 556."
+        "The firmware manual's guidance is to check motor power against drive power."
+    )
+    assert summary.outcome.source == (
+        "ABB ACS580 firmware manual · 4210 IGBT overtemperature · p. 556"
     )
 
 

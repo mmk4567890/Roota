@@ -169,9 +169,15 @@ function ReportBody({ summary }: { summary: SessionSummary }) {
         <h2 className="hud-mono-tag mb-3">Outcome</h2>
         {summary.outcome ? (
           <div className="space-y-2">
-            {summary.outcome.map((paragraph) => (
+            <h3 className="text-20 text-hud-text">{summary.outcome.headline}</h3>
+            {summary.outcome.paragraphs.map((paragraph) => (
               <p key={paragraph}>{paragraph}</p>
             ))}
+            {summary.outcome.source ? (
+              <p className="report-source font-mono text-12 text-hud-muted">
+                Source: {summary.outcome.source}
+              </p>
+            ) : null}
           </div>
         ) : (
           <p>Session closed without a diagnosis.</p>

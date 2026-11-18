@@ -107,6 +107,15 @@ export interface Event {
 
 export type SessionStatus = "active" | "closed";
 
+/** How a session ended: headline, paragraphs (action first), source line. */
+export interface Outcome {
+  /** "Root cause: <cause>" or "Escalated". */
+  headline: string;
+  paragraphs: string[];
+  /** "ABB ACS580 firmware manual · A581 Fan · p. 543"; null for escalations. */
+  source: string | null;
+}
+
 export interface SessionView {
   id: string;
   fault_id: string;
@@ -115,8 +124,8 @@ export interface SessionView {
   created_at: string;
   events: Event[];
   state: DiagnosticState;
-  /** Plain sentences for the root cause or escalation; null while checks remain. */
-  outcome: string[] | null;
+  /** Null while checks remain. */
+  outcome: Outcome | null;
 }
 
 export interface RejectedValue {
@@ -207,8 +216,8 @@ export interface SessionSummary {
   closed_at: string | null;
   causes: SummaryCause[];
   root_cause: RootCauseSummary | null;
-  /** Plain sentences for the root cause or escalation; null while in progress. */
-  outcome: string[] | null;
+  /** Null while the session is in progress. */
+  outcome: Outcome | null;
   facts: FactReport[];
   citations: CitationUsed[];
 }
