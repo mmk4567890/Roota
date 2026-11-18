@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ApiError,
   closeSession,
@@ -17,6 +17,18 @@ import { OutcomeView } from "./OutcomeView";
 import { ReportView } from "./ReportView";
 import { SessionLogDrawer } from "./SessionLogDrawer";
 import { TopBar } from "./TopBar";
+
+/** history.state marker for the entry pushed when the report opens. */
+const REPORT_HISTORY_STATE = "roota-report";
+
+function reportInHistory(): boolean {
+  const state: unknown = window.history.state;
+  return (
+    typeof state === "object" &&
+    state !== null &&
+    (state as { roota?: unknown }).roota === REPORT_HISTORY_STATE
+  );
+}
 
 /** Shown after a "Not sure" / unclear chip when the session moves on. */
 export const UNCLEAR_MOVED_ON_MESSAGE =
@@ -51,7 +63,37 @@ export function SessionScreen({
     initialObservation?.message ?? null,
   );
   const [logOpen, setLogOpen] = useState(false);
-  const [reportOpen, setReportOpen] = useState(false);
+  // A reload while the report was open lands on its history entry: reopen it.
+  const [reportOpen, setReportOpen] = useState(reportInHistory);
+
+  useEffect(() => {
+    // Back (or Forward) moves between the session and its report.
+    function onPopState(): void {
+      setReportOpen(reportInHistory());
+    }
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  function openReport(): void {
+    if (!reportInHistory()) {
+      window.history.pushState(
+        { roota: REPORT_HISTORY_STATE },
+        "",
+        window.location.href,
+      );
+    }
+    setReportOpen(true);
+  }
+
+  function closeReport(): void {
+    if (reportInHistory()) {
+      // Pops the report entry; the popstate handler closes the report.
+      window.history.back();
+      return;
+    }
+    setReportOpen(false);
+  }
 
   const closed = session.status === "closed";
   const anyBusy =
@@ -248,7 +290,7 @@ export function SessionScreen({
               paragraphs={
                 session.outcome ?? ["Session closed without a diagnosis."]
               }
-              onViewReport={() => setReportOpen(true)}
+              onViewReport={openReport}
               onCloseSession={() => void handleClose()}
               closeBusy={closeBusy}
               closed={closed}
@@ -278,7 +320,7 @@ export function SessionScreen({
       {reportOpen && isOutcome ? (
         <ReportView
           sessionId={session.id}
-          onClose={() => setReportOpen(false)}
+          onClose={closeReport}
         />
       ) : null}
     </>

@@ -3,6 +3,7 @@ import type {
   FaultInfo,
   NextAction,
   ObservationResponse,
+  SessionSummary,
   SessionView,
 } from "../api";
 
@@ -171,6 +172,26 @@ export function makeEscalatedSession(
         message: "All documented causes for this fault have been ruled out.",
       }),
     },
+    ...overrides,
+  };
+}
+
+export function makeSummary(
+  overrides: Partial<SessionSummary> = {},
+): SessionSummary {
+  return {
+    session_id: "11111111-1111-1111-1111-111111111111",
+    fault_id: "overtemperature",
+    display_name: "Drive / heatsink overtemperature",
+    equipment_label: "Line 3 conveyor drive",
+    status: "active",
+    started_at: "2026-01-01T12:00:00Z",
+    closed_at: null,
+    causes: [],
+    root_cause: null,
+    outcome: ["Escalate to a senior technician or OEM support."],
+    facts: [],
+    citations: [],
     ...overrides,
   };
 }

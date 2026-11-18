@@ -55,6 +55,16 @@ export function ReportView({ sessionId, onClose }: ReportViewProps) {
     };
   }, [sessionId]);
 
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent): void {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
   async function copyMarkdown(): Promise<void> {
     if (!markdown) {
       return;
