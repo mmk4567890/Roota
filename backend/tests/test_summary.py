@@ -178,7 +178,7 @@ def _assert_no_internal_keys(obj: object, path: str = "$") -> None:
 def test_summary_json_and_markdown_omit_internal_source_fields(
     client: TestClient,
 ) -> None:
-    """Graph ``_todo`` annotations must never reach summary clients."""
+    """Graph maintainer notes and open questions must never reach summary clients."""
     created = client.post(
         "/sessions",
         json={
@@ -187,7 +187,7 @@ def test_summary_json_and_markdown_omit_internal_source_fields(
         },
     )
     session_id = created.json()["id"]
-    # motor_exceeds_drive_power.action_source carries a ``_todo`` in the graph JSON.
+    # motor_exceeds_drive_power carries an open question in the graph JSON.
     client.post(
         f"/sessions/{session_id}/facts",
         json={
@@ -205,12 +205,13 @@ def test_summary_json_and_markdown_omit_internal_source_fields(
     assert body["root_cause"]["cause_id"] == "motor_exceeds_drive_power"
     _assert_no_internal_keys(body["root_cause"]["source"])
     _assert_no_internal_keys(body["citations"])
-    assert "_todo" not in body["root_cause"]["source"]
+    assert "open_questions" not in body["root_cause"]
+    assert "undersized drive" not in str(body)
 
     md = client.get(f"/sessions/{session_id}/summary?format=markdown")
     assert md.status_code == 200, md.text
-    assert "_todo" not in md.text
-    assert "TODO(roota)" not in md.text
+    assert "undersized drive" not in md.text
+    assert "open_questions" not in md.text
 
 
 def test_session_view_sources_omit_internal_fields(client: TestClient) -> None:

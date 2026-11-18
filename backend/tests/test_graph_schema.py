@@ -44,7 +44,7 @@ def _minimal_graph(**overrides: Any) -> dict[str, Any]:
                 "collects": ["fan_status"],
                 "source": {
                     "doc_id": "TBD_MANUAL",
-                    "section": "TODO(roota): sample source",
+                    "section": "Sample source",
                     "page": None,
                 },
             }
@@ -65,7 +65,7 @@ def _minimal_graph(**overrides: Any) -> dict[str, Any]:
                 "corrective_action": "Replace fan.",
                 "action_source": {
                     "doc_id": "TBD_MANUAL",
-                    "section": "TODO(roota): sample action source",
+                    "section": "Sample action source",
                     "page": None,
                 },
             }
@@ -222,19 +222,41 @@ def _set_ruled_out(payload: dict[str, Any], condition: Any) -> dict[str, Any]:
     return payload
 
 
-def test_accepts_todo_annotations_on_any_object() -> None:
-    payload = _minimal_graph(_todo="TODO(roota): graph-level note")
-    payload["fields"][0]["_todo"] = "TODO(roota): field note"
-    payload["checks"][0]["source"]["_todo"] = "TODO(roota): source note"
-    payload["causes"][0]["ruled_out_when"]["_todo"] = "TODO(roota): threshold note"
+def test_accepts_notes_and_open_questions_but_never_serializes_them() -> None:
+    payload = _minimal_graph(notes="Graph-level provenance note")
+    payload["causes"][0]["open_questions"] = [
+        {"question": "Is the threshold right?", "depends_on": "Manual, section 4"}
+    ]
     graph = FaultGraph.model_validate(payload)
-    assert graph.todo == "TODO(roota): graph-level note"
-    # Internal annotations stay on the model but never serialize to clients.
+    assert graph.notes == "Graph-level provenance note"
+    assert graph.causes[0].open_questions[0].depends_on == "Manual, section 4"
+    # Maintainer notes stay on the model but never serialize to clients.
     dumped = graph.model_dump(mode="json", by_alias=True)
-    assert "_todo" not in dumped
-    assert "todo" not in dumped
-    assert "_todo" not in dumped["checks"][0]["source"]
-    assert "_todo" not in dumped["fields"][0]
+    assert "notes" not in dumped
+    assert "open_questions" not in dumped["causes"][0]
+
+
+def test_rejects_the_retired_todo_annotation_key() -> None:
+    payload = _minimal_graph()
+    payload["causes"][0]["ruled_out_when"]["_todo"] = "old-style note"
+    with pytest.raises(ValidationError, match="_todo"):
+        FaultGraph.model_validate(payload)
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        {"question": "", "depends_on": "Manual, section 4"},
+        {"question": "Is it?", "depends_on": ""},
+        {"question": "Is it?"},
+        {"question": "Is it?", "depends_on": "Manual", "page": 3},
+    ],
+)
+def test_rejects_incomplete_open_questions(question: dict[str, Any]) -> None:
+    payload = _minimal_graph()
+    payload["causes"][0]["open_questions"] = [question]
+    with pytest.raises(ValidationError):
+        FaultGraph.model_validate(payload)
 
 
 def test_rejects_misspelled_cause_key() -> None:
@@ -314,7 +336,7 @@ def test_rejects_condition_on_field_the_cause_cannot_collect() -> None:
             "instruction": "Measure ambient.",
             "reason": "Ambient matters.",
             "collects": ["ambient_temp_c"],
-            "source": {"doc_id": "TBD_MANUAL", "section": "TODO(roota)", "page": None},
+            "source": {"doc_id": "TBD_MANUAL", "section": "Sample ambient section", "page": None},
         }
     )
     # check_ambient exists in the graph, but is not one of fan_fail's checks.

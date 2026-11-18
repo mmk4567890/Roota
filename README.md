@@ -34,6 +34,7 @@ Design decisions:
 - Causes can be confirmed, ruled out, open, or inconclusive when checks finish without a clear outcome.
 - Every check and corrective action carries a manual citation (`doc_id`, section, page).
 - The default keyword parser runs fully offline; the Anthropic parser is optional.
+- [Known open questions about the manual](docs/OPEN_QUESTIONS.md), recorded on each cause in the graph.
 
 ## Quick start
 

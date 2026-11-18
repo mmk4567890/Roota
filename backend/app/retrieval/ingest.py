@@ -15,7 +15,7 @@ CHUNK_OVERLAP = 150
 # Numbered headings like "7.3 Fault Codes" or "4.1.2 Cooling fan". The title
 # must start with a capitalised word of 3+ letters so spec lines such as
 # "1.5 kW rated output" or "2.2 Nm on terminals" are not taken for headings.
-# TODO(roota): tune against the real manual's heading style once it is chosen.
+# The ACS580 manual's fault tables are matched by ENTRY_START_RE below.
 # A fault or warning table entry starts a line with its 4-digit hex code and a
 # capitalised name ("4210 IGBT overtemperature", "A581 Fan"). Auxiliary codes
 # under an entry ("0002 Motor is rotating ...") start with 000 and stay with

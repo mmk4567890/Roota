@@ -23,14 +23,20 @@ class GraphModel(BaseModel):
     """Base for every graph object.
 
     Unknown keys are rejected so a typo in a graph file (e.g. ``ruled_out_whn``)
-    fails loudly instead of silently dropping a rule. ``_todo`` is the one
-    allowed annotation key, since JSON has no comments.
+    fails loudly instead of silently dropping a rule.
     """
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
-    # Graph-file annotation only — never serialize to API clients.
-    todo: str | None = Field(default=None, alias="_todo", exclude=True)
+
+class OpenQuestion(GraphModel):
+    """A point the manual leaves open, and the reference that would settle it.
+
+    Kept in the graph file for maintainers; listed in docs/OPEN_QUESTIONS.md.
+    """
+
+    question: str = Field(min_length=1)
+    depends_on: str = Field(min_length=1)
 
 
 class FieldSpec(GraphModel):
@@ -95,6 +101,8 @@ class Cause(GraphModel):
     promote_when: Condition | None = None
     corrective_action: str
     action_source: Source
+    # Maintainer notes only — never serialized to API clients.
+    open_questions: list[OpenQuestion] = Field(default_factory=list, exclude=True)
 
     def conditions(self) -> list[tuple[str, Condition]]:
         named = (
@@ -114,6 +122,8 @@ class FaultGraph(GraphModel):
     fields: list[FieldSpec] = Field(min_length=1)
     checks: list[Check] = Field(min_length=1)
     causes: list[Cause] = Field(min_length=1)
+    # Provenance and scope note for maintainers — never serialized to API clients.
+    notes: str | None = Field(default=None, exclude=True)
 
     @model_validator(mode="after")
     def validate_graph_integrity(self) -> FaultGraph:

@@ -2,7 +2,6 @@
   "fault_id": "overtemperature",
   "equipment": "vfd",
   "display_name": "Drive / heatsink overtemperature",
-  "_todo": "TODO(roota): fault codes OH/OT/OH1 are generic placeholders; replace with the chosen drive's fault codes",
   "fault_codes": [
     "OH",
     "OT",
@@ -75,7 +74,7 @@
       "values": null,
       "value_labels": null,
       "unit": "%",
-      "description": "Drive output current as a percentage of rated current. TODO(roota): confirm measurement point and rated-current basis from the chosen manual.",
+      "description": "Drive output current as a percentage of rated current.",
       "ask": "What is the drive load as a percentage of rated current?"
     },
     {
@@ -93,7 +92,7 @@
         "unclear": "Not sure"
       },
       "unit": null,
-      "description": "Whether the drive stays near or above its rated current for extended periods, rather than only during brief peaks. TODO(roota): replace with the manual's duty-cycle / overload criterion.",
+      "description": "Whether the drive stays near or above its rated current for extended periods, rather than only during brief peaks.",
       "ask": "Does the drive stay near or above rated current for long periods, or only during brief peaks?"
     },
     {
@@ -103,7 +102,7 @@
       "values": null,
       "value_labels": null,
       "unit": "°C",
-      "description": "Ambient air temperature around the drive. TODO(roota): confirm sensor location and allowable ambient from the chosen manual.",
+      "description": "Ambient air temperature around the drive.",
       "ask": "What is the ambient temperature around the drive in °C?"
     },
     {
@@ -113,7 +112,7 @@
       "values": null,
       "value_labels": null,
       "unit": "kHz",
-      "description": "Configured PWM carrier frequency. TODO(roota): confirm parameter id and default/max values from the chosen manual.",
+      "description": "Configured PWM carrier frequency.",
       "ask": "What is the carrier frequency setting in kHz?"
     }
   ],
@@ -127,9 +126,8 @@
       ],
       "source": {
         "doc_id": "TBD_MANUAL",
-        "section": "TODO(roota): cite cooling-fan inspection section from the chosen manual",
-        "page": null,
-        "_todo": "TODO(roota): replace TBD_MANUAL citation for check_fan_operation"
+        "section": "Placeholder: cooling-fan inspection section",
+        "page": null
       }
     },
     {
@@ -141,9 +139,8 @@
       ],
       "source": {
         "doc_id": "TBD_MANUAL",
-        "section": "TODO(roota): cite airflow / enclosure ventilation section from the chosen manual",
-        "page": null,
-        "_todo": "TODO(roota): replace TBD_MANUAL citation for check_airflow_path"
+        "section": "Placeholder: airflow / enclosure ventilation section",
+        "page": null
       }
     },
     {
@@ -155,9 +152,8 @@
       ],
       "source": {
         "doc_id": "TBD_MANUAL",
-        "section": "TODO(roota): cite heatsink cleaning / maintenance section from the chosen manual",
-        "page": null,
-        "_todo": "TODO(roota): replace TBD_MANUAL citation for check_heatsink_cleanliness"
+        "section": "Placeholder: heatsink cleaning / maintenance section",
+        "page": null
       }
     },
     {
@@ -169,9 +165,8 @@
       ],
       "source": {
         "doc_id": "TBD_MANUAL",
-        "section": "TODO(roota): cite load / current monitoring section from the chosen manual",
-        "page": null,
-        "_todo": "TODO(roota): replace TBD_MANUAL citation for check_load_level"
+        "section": "Placeholder: load / current monitoring section",
+        "page": null
       }
     },
     {
@@ -183,9 +178,8 @@
       ],
       "source": {
         "doc_id": "TBD_MANUAL",
-        "section": "TODO(roota): cite duty-cycle / overload rating section from the chosen manual",
-        "page": null,
-        "_todo": "TODO(roota): replace TBD_MANUAL citation for check_load_duty_cycle"
+        "section": "Placeholder: duty-cycle / overload rating section",
+        "page": null
       }
     },
     {
@@ -197,9 +191,8 @@
       ],
       "source": {
         "doc_id": "TBD_MANUAL",
-        "section": "TODO(roota): cite ambient temperature limits section from the chosen manual",
-        "page": null,
-        "_todo": "TODO(roota): replace TBD_MANUAL citation for check_ambient_temperature"
+        "section": "Placeholder: ambient temperature limits section",
+        "page": null
       }
     },
     {
@@ -211,9 +204,8 @@
       ],
       "source": {
         "doc_id": "TBD_MANUAL",
-        "section": "TODO(roota): cite carrier-frequency parameter section from the chosen manual",
-        "page": null,
-        "_todo": "TODO(roota): replace TBD_MANUAL citation for check_carrier_frequency"
+        "section": "Placeholder: carrier-frequency parameter section",
+        "page": null
       }
     }
   ],
@@ -236,16 +228,14 @@
         "value": [
           "not_running",
           "noisy"
-        ],
-        "_todo": "TODO(roota): confirm whether a noisy but running fan counts as fan failure per the chosen manual"
+        ]
       },
       "promote_when": null,
       "corrective_action": "Replace or repair the cooling fan assembly per the drive manual, then retest under load.",
       "action_source": {
         "doc_id": "TBD_MANUAL",
-        "section": "TODO(roota): cite fan replacement / corrective action section from the chosen manual",
-        "page": null,
-        "_todo": "TODO(roota): replace TBD_MANUAL citation for cooling_fan_failure corrective action"
+        "section": "Placeholder: fan replacement / corrective action section",
+        "page": null
       }
     },
     {
@@ -291,9 +281,8 @@
       "corrective_action": "Clear vents and airflow path; clean the heatsink; restore clear cooling airflow before returning to service.",
       "action_source": {
         "doc_id": "TBD_MANUAL",
-        "section": "TODO(roota): cite airflow / heatsink corrective action section from the chosen manual",
-        "page": null,
-        "_todo": "TODO(roota): replace TBD_MANUAL citation for blocked_airflow corrective action"
+        "section": "Placeholder: airflow / heatsink corrective action section",
+        "page": null
       }
     },
     {
@@ -325,8 +314,7 @@
               }
             ]
           }
-        ],
-        "_todo": "TODO(roota): confirm load thresholds (<90% clearly fine; <=100% fine if not sustained) from the chosen manual"
+        ]
       },
       "confirmed_when": {
         "any": [
@@ -349,21 +337,18 @@
               }
             ]
           }
-        ],
-        "_todo": "TODO(roota): confirm overload criterion (>100% of rated, or sustained >=90%) from the chosen manual"
+        ]
       },
       "promote_when": {
         "field": "load_percent",
         "op": "gte",
-        "value": 90,
-        "_todo": "TODO(roota): confirm load promote_when threshold (>=90%) from the chosen manual"
+        "value": 90
       },
       "corrective_action": "Reduce mechanical/process load or upsize the drive per the manual; verify current is within rating after the change.",
       "action_source": {
         "doc_id": "TBD_MANUAL",
-        "section": "TODO(roota): cite overload / sizing corrective action section from the chosen manual",
-        "page": null,
-        "_todo": "TODO(roota): replace TBD_MANUAL citation for excessive_load corrective action"
+        "section": "Placeholder: overload / sizing corrective action section",
+        "page": null
       }
     },
     {
@@ -376,22 +361,19 @@
       "ruled_out_when": {
         "field": "ambient_temp_c",
         "op": "lt",
-        "value": 40,
-        "_todo": "TODO(roota): confirm ambient ruled-out threshold (<40°C) from the chosen manual"
+        "value": 40
       },
       "confirmed_when": {
         "field": "ambient_temp_c",
         "op": "gte",
-        "value": 40,
-        "_todo": "TODO(roota): confirm ambient confirmed threshold (>=40°C) from the chosen manual"
+        "value": 40
       },
       "promote_when": null,
       "corrective_action": "Improve enclosure ventilation or relocate the drive to stay within the manual ambient rating.",
       "action_source": {
         "doc_id": "TBD_MANUAL",
-        "section": "TODO(roota): cite ambient / installation corrective action section from the chosen manual",
-        "page": null,
-        "_todo": "TODO(roota): replace TBD_MANUAL citation for high_ambient_temperature corrective action"
+        "section": "Placeholder: ambient / installation corrective action section",
+        "page": null
       }
     },
     {
@@ -404,22 +386,19 @@
       "ruled_out_when": {
         "field": "carrier_frequency_khz",
         "op": "lte",
-        "value": 8,
-        "_todo": "TODO(roota): confirm carrier ruled-out threshold (<=8 kHz) from the chosen manual"
+        "value": 8
       },
       "confirmed_when": {
         "field": "carrier_frequency_khz",
         "op": "gt",
-        "value": 8,
-        "_todo": "TODO(roota): confirm carrier confirmed threshold (>8 kHz) from the chosen manual"
+        "value": 8
       },
       "promote_when": null,
       "corrective_action": "Lower the carrier frequency to the manual-recommended value for the application and thermal limits, then retest.",
       "action_source": {
         "doc_id": "TBD_MANUAL",
-        "section": "TODO(roota): cite carrier-frequency adjustment corrective action from the chosen manual",
-        "page": null,
-        "_todo": "TODO(roota): replace TBD_MANUAL citation for carrier_frequency_too_high corrective action"
+        "section": "Placeholder: carrier-frequency adjustment corrective action",
+        "page": null
       }
     }
   ]

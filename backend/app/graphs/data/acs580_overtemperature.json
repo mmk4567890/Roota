@@ -2,7 +2,7 @@
   "fault_id": "acs580_overtemperature",
   "equipment": "vfd",
   "display_name": "ABB ACS580 drive overtemperature",
-  "_todo": "Source: ABB ACS580 standard control program firmware manual, 3AXD50000016097 Rev J (doc_id abb_acs580_fw). Pages are PDF page numbers; ABB's printed page numbers are PDF page + 2. Excluded on purpose: 4380/A4B1 Excess temperature difference (cause is motor cabling, a different isolation path), 4110 Control board temperature, 4981/4982 External temperature, 4991 Safe motor temperature.",
+  "notes": "Source: ABB ACS580 standard control program firmware manual, 3AXD50000016097 Rev J (doc_id abb_acs580_fw). Pages are PDF page numbers; ABB's printed page numbers are PDF page + 2. Excluded on purpose: 4380/A4B1 Excess temperature difference (cause is motor cabling, a different isolation path), 4110 Control board temperature, 4981/4982 External temperature, 4991 Safe motor temperature.",
   "fault_codes": [
     "4210",
     "42F1",
@@ -88,7 +88,7 @@
         "unclear": "Not sure"
       },
       "unit": null,
-      "description": "Whether the ambient temperature exceeds the temperature above which the drive must be derated. The manual (fault 4290) gives 40 °C / 104 °F and 50 °C / 122 °F for IP21 frames and refers to the Hardware manual, chapter Technical data, section Derating, for the exact limit and for IP55 frames. TODO(roota): the 4290 text gives overlapping frame ranges (R4...R9 for 40 °C, R1...R9 for 50 °C); confirm the per-frame limit from the hardware manual before encoding a temperature.",
+      "description": "Whether the ambient temperature exceeds the temperature above which the drive must be derated. The manual (fault 4290) gives 40 °C / 104 °F and 50 °C / 122 °F for IP21 frames and refers to the Hardware manual, chapter Technical data, section Derating, for the exact limit and for IP55 frames.",
       "ask": "Is the ambient temperature above the drive's derating temperature (40 °C / 104 °F or 50 °C / 122 °F depending on IP21 frame; see the Derating section of the hardware manual)?"
     },
     {
@@ -230,8 +230,7 @@
       "confirmed_when": {
         "field": "fan_status",
         "op": "eq",
-        "value": "not_running",
-        "_todo": "TODO(roota): the manual does not say whether a running but noisy fan counts as faulty, so 'noisy' leaves this cause inconclusive and investigation continues. Confirm with ABB service guidance."
+        "value": "not_running"
       },
       "promote_when": null,
       "corrective_action": "Check fan operation and connection, and replace the fan if faulty. On frame R6 and larger, read the auxiliary code of warning A581 / fault 5080 to identify the fan (0 = main fan 1; otherwise the last digit is the fan index).",
@@ -240,7 +239,13 @@
         "section": "Fault tracing: A581 Fan (printed p. 543)",
         "page": 541,
         "printed_page": 543
-      }
+      },
+      "open_questions": [
+        {
+          "question": "Does a fan that runs but is noisy count as faulty? The manual does not say, so 'noisy' leaves this cause inconclusive and investigation continues.",
+          "depends_on": "ABB ACS580 firmware manual 3AXD50000016097 Rev J, Fault tracing: A581 Fan (printed p. 543); ABB service guidance on fan wear"
+        }
+      ]
     },
     {
       "id": "blocked_airflow",
@@ -319,8 +324,7 @@
               }
             ]
           }
-        ],
-        "_todo": "TODO(roota): confirm ruled-out when ambient is unclear but load is within derated capacity — currently inconclusive so later checks continue"
+        ]
       },
       "confirmed_when": {
         "all": [
@@ -334,8 +338,7 @@
             "op": "ne",
             "value": "no"
           }
-        ],
-        "_todo": "TODO(roota): confirm that load over derated capacity confirms this cause when ambient is unclear (not known to be below derating)"
+        ]
       },
       "promote_when": null,
       "corrective_action": "At this ambient temperature the load current must not exceed the drive's derated load capacity. Bring the load current within that capacity, using the derating figures in the Hardware manual, chapter Technical data, section Derating.",
@@ -344,7 +347,21 @@
         "section": "Fault tracing: 4290 Cooling (printed p. 557)",
         "page": 555,
         "printed_page": 557
-      }
+      },
+      "open_questions": [
+        {
+          "question": "Which ambient limit applies to which frame? The 4290 text gives overlapping frame ranges (R4...R9 for 40 °C, R1...R9 for 50 °C), so no single temperature is encoded and 40-50 °C is treated as unclear.",
+          "depends_on": "ACS580 hardware manual, chapter Technical data, section Derating"
+        },
+        {
+          "question": "Should this cause be ruled out when the ambient is unclear but the load is within the derated capacity? It is currently left inconclusive so later checks continue.",
+          "depends_on": "ABB ACS580 firmware manual 3AXD50000016097 Rev J, Fault tracing: 4290 Cooling (printed p. 557); ACS580 hardware manual, section Derating"
+        },
+        {
+          "question": "Does a load over the derated capacity confirm this cause when the ambient is unclear (not known to be below the derating temperature)? It currently does.",
+          "depends_on": "ABB ACS580 firmware manual 3AXD50000016097 Rev J, Fault tracing: 4290 Cooling (printed p. 557); ACS580 hardware manual, section Derating"
+        }
+      ]
     },
     {
       "id": "motor_exceeds_drive_power",
@@ -369,9 +386,14 @@
         "doc_id": "abb_acs580_fw",
         "section": "Fault tracing: 4210 IGBT overtemperature (printed p. 556)",
         "page": 554,
-        "_todo": "TODO(roota): the firmware manual gives no corrective procedure for an undersized drive (resize, derate, or reduce load). Confirm the recommended action with the hardware manual or ABB.",
         "printed_page": 556
-      }
+      },
+      "open_questions": [
+        {
+          "question": "What is the recommended corrective action for an undersized drive: resize the drive, derate, or reduce the load? The firmware manual gives no procedure.",
+          "depends_on": "ABB ACS580 firmware manual 3AXD50000016097 Rev J, Fault tracing: 4210 IGBT overtemperature (printed p. 556); ACS580 hardware manual (drive sizing) or ABB guidance"
+        }
+      ]
     }
   ]
 }
