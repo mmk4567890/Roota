@@ -337,11 +337,13 @@ def _fact_reports(events: list[Event], graph: FaultGraph) -> list[FactReport]:
 def _citations_used(graph: FaultGraph, state: DiagnosticState) -> list[CitationUsed]:
     check_by_id = {check.id: check for check in graph.checks}
     citations: list[CitationUsed] = []
-    seen: set[tuple[str, str, int | None, str]] = set()
+    # One entry per passage: the same document + page + section cited by
+    # several checks is listed once, at its first use.
+    seen: set[tuple[str, int | None, str]] = set()
 
     def add(source: Source, used_for: str) -> None:
         page = display_page(source)
-        key = (source.doc_id, source.section, page, used_for)
+        key = (source.doc_id, page, source.section)
         if key in seen:
             return
         seen.add(key)

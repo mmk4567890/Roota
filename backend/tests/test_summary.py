@@ -487,3 +487,32 @@ def test_motor_root_cause_action_reads_plainly() -> None:
         "The firmware manual's guidance is to check motor power against drive power. "
         "Source: ABB ACS580 firmware manual, 4210 IGBT overtemperature, p. 556."
     )
+
+
+# --- Citations are listed once per passage ---
+
+
+def test_citations_are_deduplicated_by_document_page_and_section() -> None:
+    summary = _shipped_summary({**_ALL_CLEAR, "airflow_obstruction": "unclear"})
+    keys = [(cite.doc_id, cite.page, cite.section) for cite in summary.citations]
+    assert len(keys) == len(set(keys))
+    # 4210 (p. 556) is cited by the fan, heatsink and motor checks; 4290 (p. 557)
+    # by the air-flow and ambient checks. Each appears once, in first-use order.
+    assert [cite.page for cite in summary.citations] == [556, 557]
+    assert summary.citations[0].used_for == "check:check_fan_operation"
+    assert summary.citations[1].used_for == "check:check_airflow_path"
+    md = render_markdown(summary)
+    assert md.count("4210 IGBT overtemperature, p. 556") == 1
+    assert md.count("4290 Cooling, p. 557") == 1
+
+
+def test_summary_api_lists_each_passage_once(client: TestClient) -> None:
+    created = client.post(
+        "/sessions",
+        json={"fault_id": "acs580_overtemperature", "equipment_label": "Line 2"},
+    )
+    session_id = created.json()["id"]
+    client.post(f"/sessions/{session_id}/facts", json={"facts": _ALL_CLEAR})
+    body = client.get(f"/sessions/{session_id}/summary").json()
+    keys = [(c["doc_id"], c["page"], c["section"]) for c in body["citations"]]
+    assert len(keys) == len(set(keys)) == 2
