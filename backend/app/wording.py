@@ -49,10 +49,10 @@ def cause_status_label(status: str, *, outcome_reached: bool) -> str:
 def not_checked_reason(outcome_type: str) -> str:
     """Why a cause was never checked, given how the session ended."""
     if outcome_type == "root_cause":
-        return "Not checked: a root cause was found first"
+        return "A root cause was found first"
     if outcome_type == "escalate":
-        return "Not checked: the session was escalated first"
-    return "Not checked: the session was closed first"
+        return "The session was escalated first"
+    return "The session was closed first"
 
 
 def fact_phrase(spec: FieldSpec, value: Any) -> str:

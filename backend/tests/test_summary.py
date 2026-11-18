@@ -295,11 +295,11 @@ def test_causes_never_evaluated_after_a_root_cause_are_not_checked() -> None:
     for cause_id in ("blocked_airflow", "load_above_derated_capacity", "motor_exceeds_drive_power"):
         assert causes[cause_id].status == "open"
         assert causes[cause_id].status_label == "Not checked"
-        assert causes[cause_id].reason == "Not checked: a root cause was found first"
+        assert causes[cause_id].reason == "A root cause was found first"
     md = render_markdown(summary)
     assert (
         "- **Not checked** · Motor power exceeds drive power — "
-        "Not checked: a root cause was found first"
+        "A root cause was found first"
     ) in md
     assert "None" not in md
     assert "Open" not in md
@@ -516,3 +516,9 @@ def test_summary_api_lists_each_passage_once(client: TestClient) -> None:
     body = client.get(f"/sessions/{session_id}/summary").json()
     keys = [(c["doc_id"], c["page"], c["section"]) for c in body["citations"]]
     assert len(keys) == len(set(keys)) == 2
+
+
+def test_not_checked_reasons_do_not_repeat_the_badge() -> None:
+    for facts in ({"fan_status": "not_running"}, {**_ALL_CLEAR, "motor_power_vs_drive": "exceeds"}):
+        for cause in _shipped_summary(facts).causes:
+            assert not (cause.reason or "").startswith("Not checked")
