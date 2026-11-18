@@ -46,6 +46,15 @@ def cause_status_label(status: str, *, outcome_reached: bool) -> str:
     return _STATUS_LABELS[status]
 
 
+def not_checked_reason(outcome_type: str) -> str:
+    """Why a cause was never checked, given how the session ended."""
+    if outcome_type == "root_cause":
+        return "Not checked: a root cause was found first"
+    if outcome_type == "escalate":
+        return "Not checked: the session was escalated first"
+    return "Not checked: the session was closed first"
+
+
 def fact_phrase(spec: FieldSpec, value: Any) -> str:
     """``Heatsink was clean``; fields without phrases read ``Label: value``."""
     if spec.value_phrases is not None and isinstance(value, str):
@@ -94,16 +103,23 @@ def cause_reason(
 
     phrases = [fact_phrase(field_by_name[name], facts[name]) for name in answered]
     if unsure:
-        unsure_bits = "; ".join(unsure_phrase(field_by_name[name]) for name in unsure)
+        unsure_bits = _join_phrases([unsure_phrase(field_by_name[name]) for name in unsure])
         phrases.append(f"{unsure_bits} {UNSURE_NOTE}")
-    text = "; ".join(phrases)
+    text = _join_phrases(phrases)
     if cause.status == "contradiction":
         return f"Answers conflict: {_lower_first(text)}"
     return _upper_first(text)
 
 
 def _join(field_by_name: dict[str, FieldSpec], names: list[str], facts: dict[str, Any]) -> str:
-    return "; ".join(fact_phrase(field_by_name[name], facts[name]) for name in names)
+    return _join_phrases([fact_phrase(field_by_name[name], facts[name]) for name in names])
+
+
+def _join_phrases(phrases: list[str]) -> str:
+    """``Air flow clear; heatsink was clean`` — only the first part keeps its capital."""
+    return "; ".join(
+        phrase if index == 0 else _lower_first(phrase) for index, phrase in enumerate(phrases)
+    )
 
 
 def _graph_cause(graph: FaultGraph, cause_id: str) -> Cause:

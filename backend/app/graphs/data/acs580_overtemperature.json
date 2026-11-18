@@ -425,7 +425,7 @@
         "value": "exceeds"
       },
       "promote_when": null,
-      "corrective_action": "The motor's power exceeds the drive's power, so the drive is too small for this motor. The firmware manual only says to check motor power against drive power; resolve the mismatch between motor and drive ratings before returning to service.",
+      "corrective_action": "Resolve the mismatch between motor and drive ratings before returning to service: use a drive rated for the motor, or a motor within the drive's rating. The firmware manual's guidance is to check motor power against drive power.",
       "action_source": {
         "doc_id": "abb_acs580_fw",
         "section": "Fault tracing: 4210 IGBT overtemperature (printed p. 556)",

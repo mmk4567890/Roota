@@ -295,9 +295,13 @@ def test_causes_never_evaluated_after_a_root_cause_are_not_checked() -> None:
     for cause_id in ("blocked_airflow", "load_above_derated_capacity", "motor_exceeds_drive_power"):
         assert causes[cause_id].status == "open"
         assert causes[cause_id].status_label == "Not checked"
-        assert causes[cause_id].reason is None
+        assert causes[cause_id].reason == "Not checked: a root cause was found first"
     md = render_markdown(summary)
-    assert "- **Not checked** · Motor power exceeds drive power" in md
+    assert (
+        "- **Not checked** · Motor power exceeds drive power — "
+        "Not checked: a root cause was found first"
+    ) in md
+    assert "None" not in md
     assert "Open" not in md
 
 
@@ -440,4 +444,46 @@ def test_session_api_returns_the_outcome_sentences(client: TestClient) -> None:
     assert reported.status_code == 200, reported.text
     assert reported.json()["outcome"][0].startswith(
         "Root cause found: Cooling fan not operating."
+    )
+
+
+def test_open_causes_have_no_reason_mid_session() -> None:
+    summary = _shipped_summary({"fan_status": "normal"})
+    assert _by_id(summary)["blocked_airflow"].reason is None
+
+
+def test_joined_reasons_lowercase_every_part_after_the_first() -> None:
+    summary = _shipped_summary(
+        {"fan_status": "normal", "airflow_obstruction": "none", "heatsink_condition": "clean"}
+    )
+    assert _by_id(summary)["blocked_airflow"].reason == (
+        "Air flow clear; heatsink was clean"
+    )
+
+
+def test_several_unsure_checks_join_in_lowercase() -> None:
+    summary = _shipped_summary(
+        {
+            "fan_status": "normal",
+            "airflow_obstruction": "unclear",
+            "heatsink_condition": "unclear",
+            "ambient_above_derating_temp": "no",
+            "motor_power_vs_drive": "within",
+        }
+    )
+    assert _by_id(summary)["blocked_airflow"].reason == (
+        "Air flow not confirmed; heatsink condition not confirmed "
+        "(technician wasn't sure)"
+    )
+
+
+def test_motor_root_cause_action_reads_plainly() -> None:
+    summary = _shipped_summary({**_ALL_CLEAR, "motor_power_vs_drive": "exceeds"})
+    assert summary.outcome is not None
+    assert summary.outcome[0] == (
+        "Root cause found: Motor power exceeds drive power. "
+        "Resolve the mismatch between motor and drive ratings before returning to "
+        "service: use a drive rated for the motor, or a motor within the drive's rating. "
+        "The firmware manual's guidance is to check motor power against drive power. "
+        "Source: ABB ACS580 firmware manual, 4210 IGBT overtemperature, p. 556."
     )

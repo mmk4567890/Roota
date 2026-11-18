@@ -23,7 +23,12 @@ from app.engine.schema import (
 )
 from app.manuals import full_doc_citation, section_short_label, short_doc_name
 from app.models import Event
-from app.wording import cause_reason, cause_status_label, outcome_paragraphs
+from app.wording import (
+    cause_reason,
+    cause_status_label,
+    not_checked_reason,
+    outcome_paragraphs,
+)
 
 
 class FactReport(BaseModel):
@@ -134,6 +139,7 @@ def build_summary(
             state.causes,
             state.facts,
             outcome_reached=closed or state.next_action.type in ("root_cause", "escalate"),
+            outcome_type=state.next_action.type,
         ),
         root_cause=root_cause,
         outcome=outcome_paragraphs(graph, state),
@@ -223,17 +229,27 @@ def _summary_causes(
     facts: dict[str, Any],
     *,
     outcome_reached: bool,
+    outcome_type: str,
 ) -> list[SummaryCause]:
-    return [
-        SummaryCause(
-            cause_id=cause.cause_id,
-            name=cause.name,
-            status=cause.status,
-            status_label=cause_status_label(cause.status, outcome_reached=outcome_reached),
-            reason=cause_reason(graph, cause, facts),
+    summary_causes: list[SummaryCause] = []
+    for cause in causes:
+        not_checked = outcome_reached and cause.status == "open"
+        summary_causes.append(
+            SummaryCause(
+                cause_id=cause.cause_id,
+                name=cause.name,
+                status=cause.status,
+                status_label=cause_status_label(
+                    cause.status, outcome_reached=outcome_reached
+                ),
+                reason=(
+                    not_checked_reason(outcome_type)
+                    if not_checked
+                    else cause_reason(graph, cause, facts)
+                ),
+            )
         )
-        for cause in causes
-    ]
+    return summary_causes
 
 
 def _fact_report(
