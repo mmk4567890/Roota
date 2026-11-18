@@ -1,0 +1,32 @@
+services:
+  backend:
+    build: ./backend
+    environment:
+      ROOTA_PARSER: ${ROOTA_PARSER:-keyword}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ROOTA_LLM_MODEL: ${ROOTA_LLM_MODEL:-}
+    volumes:
+      - roota-data:/app/data
+      - ./docs/manuals:/docs/manuals:ro
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  roota-data:

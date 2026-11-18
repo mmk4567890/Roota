@@ -38,6 +38,16 @@ Design decisions:
 
 ## Quick start
 
+**Docker Compose** (fastest):
+
+```bash
+docker compose up
+```
+
+Open http://localhost:5173. The backend runs with the offline keyword parser; sessions and the ingested manual are kept in the `roota-data` volume. Citations need the manual: see [Getting the manual](#getting-the-manual) for the ingest command inside the container.
+
+### Manual setup
+
 **Backend** (Python 3.11+):
 
 ```bash
@@ -71,6 +81,18 @@ python -m app.retrieval.ingest ../docs/manuals/<file>.pdf --doc-id abb_acs580_fw
 python scripts/check_citations.py
 ```
 
+With Docker Compose, `docs/manuals/` is mounted into the backend container, so with the stack running:
+
+```bash
+docker compose exec backend python -m app.retrieval.ingest ../docs/manuals/<file>.pdf --doc-id abb_acs580_fw --title "ABB ACS580 firmware manual"
+```
+
+```bash
+docker compose exec backend python scripts/check_citations.py
+```
+
+The embedding model is already in the image, so no prefetch step is needed there.
+
 Without the manual Roota still runs, but recommendations show no cited passages.
 
 ## Try it
@@ -87,14 +109,14 @@ Use the **quick-answer buttons** under each check (including **Not sure**) or th
 ## Testing
 
 ```bash
-# Backend — expect 273 passed, 3 skipped (live tests opt-in with --live)
+# Backend — expect 282 passed, 3 skipped (live tests opt-in with --live)
 cd backend
 python -X dev -m pytest -W error::DeprecationWarning -W error::ResourceWarning
 
 # Keyword parser eval against the shipped ACS580 graph — 80/80 cases, 93/93 fields
 python scripts/eval_parser.py --parser keyword
 
-# Frontend — expect 29 passed; also type-check + production build
+# Frontend — expect 30 passed; also type-check + production build
 cd frontend
 npm test
 npm run build
